@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor V7 - Detector de Contexto Médico</title>
+    <!-- Librerías externas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <!-- WordCloud2 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.0.2/wordcloud2.min.js"></script>
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* --- ESTILOS CSS PERSONALIZADOS --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #00d4ff;
+            text-align: center;
+            font-weight: 800;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            padding: 20px 0;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        h2, h3 {
+            color: #00d4ff;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #00d4ff33;
+            padding-bottom: 10px;
+        }
+
+        h2 i, h3 i {
+            margin-right: 10px;
+        }
+
+        .sidebar {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            border-right: 2px solid #00d4ff;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .metrics-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .metric-card {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.2);
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 1.1em;
+            color: #a0a0a0;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        button {
+            background: linear-gradient(90deg, #00d4ff 0%, #0099cc 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+            width: 100%;
+            cursor: pointer;
+        }
+
+        button:hover:not(:disabled) {
+            background: linear-gradient(90deg, #0099cc 0%, #00d4ff 100%);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .file-uploader {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 30px;
+            border: 2px dashed #00d4ff;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .file-uploader input {
+            display: none;
+        }
+
+        .file-uploader i {
+            font-size: 3em;
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+
+        select, .select-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px 20px;
+            color: white;
+            border: 1px solid #00d4ff;
+            width: 100%;
+            margin: 10px 0 20px 0;
+            cursor: pointer;
+        }
+
+        select option {
+            background: #1a1a2e;
+        }
+
+        .info-box {
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #00d4ff;
+            margin: 20px 0;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .chart-container canvas {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 300px;
+            max-height: 400px;
+        }
+
+        .wordcloud-wrapper {
+            width: 100%;
+            height: 400px;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #wordcloud-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            margin: 30px 0;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        th {
+            background: #00d4ff22;
+            color: #00d4ff;
+            padding: 15px;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            backdrop-filter: blur(10px);
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #00d4ff22;
+        }
+
+        .row-extremo { background-color: #FF0000 !important; color: white; }
+        .row-alto { background-color: #8B0000 !important; color: white; }
+        .row-medio { background-color: #aa6600 !important; color: white; }
+        .row-bajo { background-color: #1E3F20 !important; color: white; }
+        .row-revision { background-color: #3102c0 !important; color: white; }
+        .row-descartado { background-color: #8602af !important; color: white; }
+
+        .spinner {
+            border: 4px solid #00d4ff22;
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            color: #a0a0a0;
+            padding: 30px 0 20px;
+            border-top: 2px solid #00d4ff33;
+            margin-top: 40px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            background: #00d4ff;
+            color: #0f0f1e;
+        }
+
+        hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+            margin: 30px 0;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+        }
+
+        .text-highlight {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        
+        .text-medical {
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+
+        .caption {
+            text-align: center;
+            color: #a0a0a0;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <h1>🛡️ Monitor V7: Inteligencia Médica</h1>
+        <div style="text-align: center; color: #a0a0a0; font-size: 1.2em; margin-bottom: 30px;">
+            <b>Novedad:</b> Distingue entre <span class="text-highlight">riesgo suicida</span> 
+            y <span class="text-medical">dolor físico/enfermedad</span>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h3><i class="fas fa-file-upload"></i> Carga de Archivos</h3>
+            <div class="file-uploader" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept=".csv,.xlsx,.txt">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p>Sube tu archivo (CSV, Excel, TXT)</p>
+                <small style="color: #a0a0a0;">Haz clic para seleccionar</small>
+            </div>
+
+            <div id="columnSelectorContainer" style="display: none;">
+                <label for="columnSelect">Selecciona columna de texto:</label>
+                <select id="columnSelect" class="select-box"></select>
+                <button onclick="analyzeFile()" id="analyzeBtn">
+                    <i class="fas fa-play"></i> INICIAR ANÁLISIS
+                </button>
+            </div>
+
+            <div class="info-box" style="margin-top: 20px;">
+                <h4 style="color: #00d4ff; margin-bottom: 10px;">ℹ️ Información</h4>
+                <p style="font-size: 0.9em;">Este sistema analiza texto en busca de indicadores de riesgo, diferenciando contextos médicos de alertas reales.</p>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        <div id="resultsContainer" style="display: none;">
+            <!-- Métricas -->
+            <h2><i class="fas fa-chart-bar"></i> Métricas del Análisis</h2>
+            <div class="metrics-container" id="metricsContainer"></div>
+
+            <hr>
+
+            <!-- Gráficos -->
+            <div class="charts-grid">
+                <!-- Nube de palabras (CORREGIDA) -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-cloud"></i> Palabras de Riesgo Detectadas</h3>
+                    <div class="wordcloud-wrapper">
+                        <canvas id="wordcloud-canvas"></canvas>
+                    </div>
+                    <p class="caption">Términos más usados en oraciones de riesgo (tamaño = frecuencia)</p>
+                </div>
+
+                <!-- Palabras más frecuentes -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-chart-simple"></i> Palabras Más Usadas (Global)</h3>
+                    <canvas id="freqWordsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico de distribución -->
+            <div class="chart-container" style="margin: 30px 0;">
+                <h3><i class="fas fa-chart-pie"></i> Panorama General de Riesgos</h3>
+                <canvas id="distributionChart"></canvas>
+            </div>
+
+            <!-- Tabla -->
+            <h2><i class="fas fa-table"></i> Registro Detallado</h2>
+            <div class="info-box" style="margin: 20px 0;">
+                <i class="fas fa-info-circle"></i> Mostrando casos con Score > 0 y casos de 'Revisión: Ambigüedad Médica'
+            </div>
+            <div class="table-container" id="tableContainer"></div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Monitor V7 - Sistema de Detección Inteligente</p>
+            <p style="font-size: 0.8em;">Desarrollado con ❤️ para la prevención</p>
+        </div>
+    </div>
+
+    <script>
+        // --- LÓGICA DEL DETECTOR ---
+        class DetectorMotor {
+            constructor() {
+                this.keywords = {
+                    "quisiera matarme": 10, "quiero matarme": 10, "voy a matarme": 10,
+                    "ojala matarme": 10, "ojalá matarme": 10, "valor para matarme": 10,
+                    "me quiero matar": 10, "me voy a matar": 10, "me quitare la vida": 10,
+                    "me quitaré la vida": 10, "me quiero quitar la vida": 10,
+                    "me suicidare": 10, "me suicidaré": 10, "quiero suicidarme": 10,
+                    "voy a suicidarme": 10, "me quiero suicidar": 10, "me voy a suicidar": 10,
+                    "me matare": 10, "me mataré": 10, "fuerzas para matarme": 10,
+                    "pensando seriamente en el suicidio": 10, "pensado mucho en el suicidio": 10,
+                    "pensando mucho en el suicidio": 10, "pensamientos claros de suicidio": 10,
+                    "quiero morir": 7, "quisiera morir": 7, "voy a morir": 7,
+                    "ojala morir": 9, "ojalá morir": 9, "valor para morir": 9,
+                    "sin ganas de vivir": 8, "no quiero vivir": 8, "no quiero seguir viviendo": 8,
+                    "no quiero continuar viviendo": 8, "terminar con mi vida": 8,
+                    "acabar con mi vida": 8, "quitarme la vida": 8, "quitarse la vida": 8,
+                    "considero la idea de morir": 8, "considero mas la idea de morir": 8,
+                    "considero más la idea de morir": 8, "pienso en el suicidio": 9,
+                    "he pensado en el suicidio": 9, "estoy pensando en el suicidio": 9,
+                    "estar muerto sería mejor": 8, " estar muerto seria mejor": 8,
+                    "la idea de no vivir más se siente como un alivio": 8,
+                    "la idea de no vivir mas se siente como un alivio": 8,
+
+                    "abuso": 7, "abusar": 7, "abusado": 7, "abusada": 7,
+                    "acoso": 7, "acosar": 7, "acosado": 7, "acosada": 7,
+                    "violacion": 7, "violación": 7, "violar": 7, "violado": 7, "violada": 7,
+
+                    "pegarme un tiro": 6, "siento que soy una carga": 6,
+                    "no tengo ganas ni de existir": 6, "no quiero ya existir": 6,
+                    "he perdido interes en casi todo": 5, "he perdido interés en casi todo": 5,
+                    "pensar en dejar de existir me calma": 5, "pienso en terminar con todo": 5,
+                    "no espero nada bueno del mañana": 5, "no espero nada bueno del futuro": 5,
+                    "siento que estorbo": 4, "solo estorbo": 4, "sólo estorbo": 4, "no quiero existir": 4,
+                    "no seguir viviendo": 4, "no continuar viviendo": 4, "hacerme dano": 4, "me hago dano": 4,
+                    "ojalá no despertara": 4, "no sirvo de mucho": 4, "me siento vacío": 4, "me siento vacio": 4,
+                    "me quisiera colgar": 4, "me quiero colgar": 4, "quisiera colgarme": 4, "quiero terminar con todo": 4,
+                    "voy a colgarme": 4, "me quisiera ahorcar": 4, "me quiero ahorcar": 4, "suicidarme": 4, 
+                    "al ver como mi contexto, y como avanza tan rápido": 4, "quisiera ahorcarme": 4, "voy a ahorcarme": 4,
+
+                    "suicidio": 3, "suicidar": 3, "ya no quiero estar aqui": 3, "matarme": 3, "colgarme": 3, "ahorcarme": 3,
+                    "nadie me extranaria": 3, "ya no aguanto": 3, "nada me emociona": 3,
+                    "cansado de vivir": 3, "llorar": 3, "menos ganas": 3, "fallecio": 3, "murio": 3, "murió": 3,
+                    "muerte": 3, "muerto": 3, "fallecer": 3, "fallecido": 3, "falleció": 3,
+                    
+                    "maten": 2, "ahorcar": 2, "cortarme": 2, "me siento sola": 2, "me siento solo": 2, "sin esperanza": 2,
+                    "depresion": 2, "depresión": 2, "no hay salida": 2, "dormir para no despertar": 2, "dormir y no despertar": 2,
+                    "para que continuar": 2, "me siento mal": 2, "nada mejora": 2, "para que sigo": 2, "para que vivir": 2,
+                    "para que seguir": 2, "sin ganas de hacer nada": 2, "sin ganas de hacer nada más": 2,
+                    "sin ganas de hacer nada mas": 2, "no tengo ganas de hacer nada": 2,
+
+                    "colgar": 1,  "agotado": 1, "agotada": 1, "pastillas": 1, "pastilla": 1, "sin fuerzas": 1, "incomodo": 1,
+                    "dormir para siempre": 1, "morir": 1, "tristeza": 1, "triste": 1, "solo": 1, "estres": 1, "estrés": 1, 
+                    "ansiedad": 1, "matar": 1, "cansado": 1, "cansada": 1, "estoy atrapado": 1, "estoy atrapada": 1,
+
+                    "cargado": -1, "aburri": -1, "aburrí": -1, "aburrido": -1, "descansado": -1, "ir a mi casa": -1, "trabaje": -1,
+                    "ir a casa": -1, "mate": -1, "lei": -1, "leí": -1, "reprobe": -1, "reprobé": -1, "poco": -1, "carga": -1, 
+                    "prueba": -1, "pelicula": -1, "película": -1, "weba": -1, "gueva": -1, "caminando": -1, "equipo": -1,
+                
+                    "videojuego": -2, "juego": -2, "exposicion": -2, "clase": -2, "examen": -2, "es un juego": -2, 
+                    "que oso": -2, "que verguenza": -1, "broma": -2, "chiste": -2, "día de muertos": -2,
+                    "paz": -2, "contento": -2, "feliz": -2, "alegre": -2, "emocionado": -2, "dia de muertos": -2,
+                    "positivo": -2, "catrina": -3, "trabajos": -2, "divertido": -2, "divertida": -2, "matematicas": -2, 
+                    "alegria": -2, "alegría": -2, "tengo sueno": -2, "tengo mucho sueno": -2, "me da sueno": -2,
+                    "me da mucho sueno": -2, "trabajando": -2, "telefono": -2, "celular": -2, "hice el oso": -2,
+                    "ajaja": -3, "jajaja": -3, "JAJAJ": -3, "hahaha": -3, "HAHAHA": -3, "tarea": -3, "trabajo escolar": -3,
+                };
+                
+                this.exclusionList = [
+                    "morir de risa", "morir de amor", "morir de sueño", "matar el tiempo", "matar el aburrimiento",
+                    "me quiero matar de la risa", "en el videojuego", "matar enemigos",
+                ];
+
+                this.medicalContext = [
+                    "dolor de panza", "me duele la panza", "dolor de estomago",
+                    "dolor de cabeza", "me duele la cabeza", "gripe", "tos",
+                    "infeccion", "fiebre", "receta", "medico", "doctor",
+                    "me duele", "inflamacion", "vomito", "mareo", "cólico"
+                ];
+
+                this.ambiguousWords = ["pastillas", "pastilla", "dormir", "medicamento", "droga", "quiero morir", "me quiero morir", "morir"];
+            }
+
+            normalizarTexto(texto) {
+                if (!texto || texto === null) return "";
+                let t = String(texto).toLowerCase();
+                t = t.replace(/¤/g, "ñ");
+                t = t.replace(/¡/g, "i");
+                t = t.replace(/¢/g, "o");
+                t = t.replace(/£/g, "u");
+                t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return t;
+            }
+
+            analizarTexto(textoOriginal) {
+                if (!textoOriginal || String(textoOriginal).trim() === "") {
+                    return { nivel: "Nulo", puntaje: 0, matches: [] };
+                }
+
+                const textoLimpio = this.normalizarTexto(textoOriginal);
+
+                for (let fraseSegura of this.exclusionList) {
+                    if (this.normalizarTexto(fraseSegura) === textoLimpio || textoLimpio.includes(this.normalizarTexto(fraseSegura))) {
+                        return { nivel: "Descartado - Frase Metaforica", puntaje: 1, matches: [] };
+                    }
+                }
+
+                let esContextoMedico = false;
+                for (let medTerm of this.medicalContext) {
+                    if (textoLimpio.includes(this.normalizarTexto(medTerm))) {
+                        esContextoMedico = true;
+                        break;
+                    }
+                }
+
+                if (!esContextoMedico) {
+                    if (textoLimpio.includes("panza") || textoLimpio.includes("estomago") || textoLimpio.includes("cabeza")) {
+                        if (textoLimpio.includes("duele") || textoLimpio.includes("dolor")) {
+                            esContextoMedico = true;
+                        }
+                    }
+                }
+
+                let puntaje = 0;
+                let matches = [];
+                let riesgoAnuladoPorMedico = false;
+
+                for (let [word, peso] of Object.entries(this.keywords)) {
+                    if (textoLimpio.includes(word)) {
+                        if (esContextoMedico && this.ambiguousWords.includes(word)) {
+                            riesgoAnuladoPorMedico = true;
+                            continue;
+                        }
+                        puntaje += peso;
+                        matches.push(word);
+                    }
+                }
+
+                let nivel;
+                if (puntaje === 0 && riesgoAnuladoPorMedico) {
+                    nivel = "Revisión: Ambigüedad Médica";
+                } else if (puntaje <= 3 && puntaje > 0) {
+                    nivel = "Bajo - Precaución Leve";
+                } else if (puntaje <= 0) {
+                    nivel = "Nulo - Sin riesgo detectado";
+                } else if (puntaje <= 7 && puntaje > 3) {
+                    nivel = "Medio - Vigilancia/Seguimiento";
+                } else if (puntaje <= 10 && puntaje > 7) {
+                    nivel = "ALTO - Atención Requerida";
+                } else {
+                    nivel = "EXTREMO - INTERVENCIÓN INMEDIATA";
+                }
+
+                return { nivel, puntaje, matches };
+            }
+        }
+
+        // --- VARIABLES GLOBALES ---
+        const detector = new DetectorMotor();
+        let fileData = null;
+        let fileName = "";
+        let results = [];
+
+        // --- MANEJADOR DE ARCHIVOS ---
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileName = file.name;
+            const reader = new FileReader();
+
+            if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    parseTextFile(text, fileName);
+                };
+                reader.readAsText(file, 'utf-8');
+            } else if (fileName.endsWith('.xlsx')) {
+                reader.onload = function(event) {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    parseExcel(jsonData);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        function parseTextFile(text, fileName) {
+            if (fileName.endsWith('.csv')) {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                if (lines.length === 0) return;
+                
+                const headers = lines[0].split(',').map(h => h.trim());
+                const data = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',').map(v => v.trim());
+                    if (values.length === headers.length) {
+                        const row = {};
+                        headers.forEach((h, idx) => row[h] = values[idx]);
+                        data.push(row);
+                    }
+                }
+                fileData = data;
+            } else {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                fileData = lines.map((line, idx) => ({ 'Linea': line, 'ID': idx + 1 }));
+            }
+            
+            showColumnSelector(fileData);
+        }
+
+        function parseExcel(rows) {
+            if (rows.length === 0) return;
+            
+            const headers = rows[0];
+            const data = [];
+            
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.length === 0) continue;
+                
+                const rowObj = {};
+                headers.forEach((h, idx) => {
+                    rowObj[h] = row[idx] !== undefined ? row[idx] : '';
+                });
+                data.push(rowObj);
+            }
+            
+            fileData = data;
+            showColumnSelector(fileData);
+        }
+
+        function showColumnSelector(data) {
+            if (!data || data.length === 0) return;
+            
+            const columns = Object.keys(data[0]);
+            const select = document.getElementById('columnSelect');
+            select.innerHTML = '';
+            
+            columns.forEach(col => {
+                const option = document.createElement('option');
+                option.value = col;
+                option.textContent = col;
+                select.appendChild(option);
+            });
+            
+            document.getElementById('columnSelectorContainer').style.display = 'block';
+        }
+
+        // --- ANÁLISIS PRINCIPAL ---
+        function analyzeFile() {
+            if (!fileData) return;
+            
+            const column = document.getElementById('columnSelect').value;
+            if (!column) return;
+            
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+            
+            setTimeout(() => {
+                try {
+                    results = [];
+                    let allCriticalKeywords = [];
+                    
+                    fileData.forEach((row, index) => {
+                        const text = row[column] || '';
+                        const { nivel, puntaje, matches } = detector.analizarTexto(text);
+                        
+                        if (String(text).trim() !== '') {
+                            results.push({
+                                ID: index + 1,
+                                Texto: String(text).trim(),
+                                Nivel: nivel,
+                                Score: puntaje,
+                                Detalles: matches.join(', ')
+                            });
+                            
+                            if (puntaje > 0) {
+                                matches.forEach(word => {
+                                    if (detector.keywords[word] >= 4) {
+                                        // Reemplazar espacios para mejor visualización
+                                        allCriticalKeywords.push(word.replace(/ /g, '_'));
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    
+                    const dfRiesgo = results.filter(r => r.Score > 0);
+                    const dfRevision = results.filter(r => r.Nivel === "Revisión: Ambigüedad Médica");
+                    
+                    updateMetrics(results.length, dfRiesgo.length, dfRevision.length);
+                    
+                    // Actualizar nube de palabras (CORREGIDO)
+                    if (allCriticalKeywords.length > 0) {
+                        updateWordCloud(allCriticalKeywords);
+                    } else {
+                        showNoWordCloud();
+                    }
+                    
+                    updateFreqWords(column);
+                    updateDistributionChart(results);
+                    updateTable(results);
+                    
+                    document.getElementById('resultsContainer').style.display = 'block';
+                } catch (error) {
+                    alert('Error al analizar: ' + error.message);
+                } finally {
+                    document.getElementById('loadingSpinner').style.display = 'none';
+                }
+            }, 100);
+        }
+
+        // --- NUBE DE PALABRAS CORREGIDA ---
+        function updateWordCloud(keywords) {
+            const canvas = document.getElementById('wordcloud-canvas');
+            if (!canvas) return;
+            
+            // Limpiar canvas
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Contar frecuencias
+            const wordCount = {};
+            keywords.forEach(w => wordCount[w] = (wordCount[w] || 0) + 1);
+            
+            // Convertir a array para WordCloud2
+            const wordArray = Object.entries(wordCount).map(([word, count]) => [word, count]);
+            
+            // Configurar dimensiones del canvas
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth || 600;
+            canvas.height = container.clientHeight || 400;
+            
+            // Configuración de WordCloud2
+            const options = {
+                list: wordArray,
+                gridSize: 16,
+                weightFactor: function (w) {
+                    return Math.pow(w, 0.8) * 20; // Ajustar tamaño
+                },
+                fontFamily: 'Arial, sans-serif',
+                color: function (word, weight) {
+                    // Colores en tonos rojos/naranjas
+                    const hue = Math.floor(Math.random() * 20) + 340; // Rojos
+                    return `hsl(${hue}, 100%, 60%)`;
+                },
+                rotateRatio: 0.3,
+                rotationSteps: 2,
+                backgroundColor: '#0f0f1e',
+                minSize: 12,
+                shape: 'circle',
+                ellipticity: 0.7
+            };
+            
+            try {
+                // Ejecutar WordCloud
+                if (WordCloud && canvas) {
+                    WordCloud(canvas, options);
+                }
+            } catch (e) {
+                console.error('Error en wordcloud:', e);
+                showNoWordCloud();
+            }
+        }
+
+        function showNoWordCloud() {
+            const canvas = document.getElementById('wordcloud-canvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#a0a0a0';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✅ No hay palabras de alto riesgo', canvas.width/2, canvas.height/2);
+        }
+
+        // --- RESTO DE FUNCIONES ---
+        function updateMetrics(total, alertas, falsos) {
+            const container = document.getElementById('metricsContainer');
+            container.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-label"><i class="fas fa-envelope"></i> Total Mensajes</div>
+                    <div class="metric-value">${total}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label"><i class="fas fa-exclamation-triangle"></i> Alertas Reales</div>
+                    <div class="metric-value">${alertas}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label"><i class="fas fa-hospital"></i> Falsos Positivos (Médicos)</div>
+                    <div class="metric-value">${falsos}</div>
+                </div>
+            `;
+        }
+
+        function updateFreqWords(column) {
+            let allText = fileData.map(row => row[column] || '').join(' ').toLowerCase();
+            allText = allText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            const words = allText.split(/\s+/);
+            
+            const stopwords = new Set(['de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'se', 'del', 'las', 'un', 'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al', 'lo', 'como', 'mas', 'pero', 'sus', 'le', 'ya', 'o', 'fue', 'este', 'ha', 'si', 'porque', 'esta', 'son', 'entre', 'cuando', 'muy', 'sin', 'sobre', 'tambien', 'me', 'hasta', 'hay', 'donde', 'quien', 'desde', 'todo', 'nos', 'durante', 'todos', 'uno', 'les', 'ni', 'contra', 'otros', 'ese', 'eso', 'ante', 'ellos', 'e', 'esto', 'mi', 'antes', 'algunos', 'que', 'unos', 'yo', 'otro', 'otras', 'otra', 'el', 'tanto', 'esa', 'estos', 'mucho', 'quienes', 'nada', 'muchos', 'cual', 'poco', 'ella', 'estar', 'estas', 'algunas', 'algo', 'nosotros', 'mi', 'mis', 'tu', 'te', 'ti', 'tus', 'ellas', 'nosotras', 'vosotros', 'vosotras', 'os', 'mio', 'mia', 'mios', 'mias', 'tuyo', 'tuya', 'tuyos', 'tuyas', 'suyo', 'suya', 'suyos', 'suyas', 'nuestro', 'nuestra', 'nuestros', 'nuestras', 'vuestro', 'vuestra', 'vuestros', 'vuestras', 'esos', 'esas', 'estoy', 'estas', 'estamos', 'estais', 'estan', 'este', 'estes', 'estemos', 'esteis', 'esten', 'estare', 'estaras', 'estara', 'estaremos', 'estareis', 'estaran', 'estaria', 'estarias', 'estariamos', 'estariais', 'estarian', 'estaba', 'estabas', 'estabamos', 'estabais', 'estaban', 'estuve', 'estuviste', 'estuvo', 'estuvimos', 'estuvisteis', 'estuvieron', 'estuviera', 'estuvieras', 'estuvieramos', 'estuvierais', 'estuvieran', 'estuviese', 'estuvieses', 'estuviesemos', 'estuvieseis', 'estuviesen', 'estando', 'estado', 'estada', 'estados', 'estadas', 'estad', 'he', 'has', 'han', 'hemos', 'habeis', 'hayan', 'haya', 'hayas', 'hayamos', 'hayais', 'hubo', 'hubieron', 'hubiera', 'hubiese', 'hubimos', 'hubiste', 'hubisteis', 'habia', 'habias', 'habiamos', 'habiais', 'habian', 'habre', 'habras', 'habra', 'habremos', 'habreis', 'habran', 'habria', 'habrias', 'habriamos', 'habriais', 'habrian', 'haber', 'habido', 'habida', 'habidos', 'habidas', 'sed', 'soy', 'eres', 'somos', 'sois', 'sea', 'seas', 'seamos', 'seais', 'sean', 'sere', 'seras', 'sera', 'seremos', 'sereis', 'seran', 'seria', 'serias', 'seriamos', 'seriais', 'serian', 'era', 'eras', 'eramos', 'erais', 'eran', 'fui', 'fuiste', 'fue', 'fuimos', 'fuisteis', 'fueron', 'fuera', 'fueras', 'fueramos', 'fuerais', 'fueran', 'fuese', 'fueses', 'fuesemos', 'fueseis', 'fuesen', 'sintiendo', 'sentido', 'sentida', 'sentidos', 'sentidas', 'siente', 'sentid', 'tengo', 'tienes', 'tiene', 'tenemos', 'teneis', 'tienen', 'tenga', 'tengas', 'tengamos', 'tengais', 'tengan', 'tendre', 'tendras', 'tendra', 'tendremos', 'tendreis', 'tendran', 'tendria', 'tendrias', 'tendriamos', 'tendriais', 'tendrian', 'tenia', 'tenias', 'teniamos', 'teniais', 'tenian', 'tuve', 'tuviste', 'tuvo', 'tuvimos', 'tuvisteis', 'tuvieron', 'tuviera', 'tuvieras', 'tuvieramos', 'tuvierais', 'tuvieran', 'tuviese', 'tuvieses', 'tuviesemos', 'tuvieseis', 'tuviesen', 'teniendo', 'tenido', 'tenida', 'tenidos', 'tenidas', 'tened']);
+            
+            const wordCount = {};
+            words.forEach(word => {
+                word = word.replace(/[^\w]/g, '');
+                if (word && word.length > 2 && !stopwords.has(word)) {
+                    wordCount[word] = (wordCount[word] || 0) + 1;
+                }
+            });
+            
+            const sorted = Object.entries(wordCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            if (sorted.length === 0) {
+                document.getElementById('freqWordsChart').style.display = 'none';
+                return;
+            }
+            
+            const canvas = document.getElementById('freqWordsChart');
+            const parent = canvas.parentNode;
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = 'freqWordsChart';
+            parent.replaceChild(newCanvas, canvas);
+            
+            const ctx = newCanvas.getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(item => item[0]),
+                    datasets: [{
+                        label: 'Frecuencia',
+                        data: sorted.map(item => item[1]),
+                        backgroundColor: 'rgba(0, 212, 255, 0.7)',
+                        borderColor: '#00d4ff',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: { display: false }
+                    },
+                    scales: {
+                        x: { grid: { color: '#00d4ff22' }, ticks: { color: '#a0a0a0' } },
+                        y: { grid: { display: false }, ticks: { color: '#a0a0a0' } }
+                    }
+                }
+            });
+        }
+
+        function updateDistributionChart(results) {
+            const levelCount = {};
+            results.forEach(r => {
+                levelCount[r.Nivel] = (levelCount[r.Nivel] || 0) + 1;
+            });
+            
+            const labels = Object.keys(levelCount);
+            const data = Object.values(levelCount);
+            
+            const colors = labels.map(label => {
+                if (label.includes('EXTREMO')) return '#FF0000';
+                if (label.includes('ALTO')) return '#8B0000';
+                if (label.includes('Medio')) return '#aa6600';
+                if (label.includes('Bajo')) return '#1E3F20';
+                if (label.includes('Revisión')) return '#8A2BE2';
+                if (label.includes('Descartado')) return '#0047AB';
+                return '#808080';
+            });
+            
+            const canvas = document.getElementById('distributionChart');
+            const parent = canvas.parentNode;
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = 'distributionChart';
+            parent.replaceChild(newCanvas, canvas);
+            
+            const ctx = newCanvas.getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: 'white',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            color: 'white',
+                            font: { weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#00d4ff22' }, ticks: { color: '#a0a0a0' } },
+                        x: { grid: { display: false }, ticks: { color: '#a0a0a0', maxRotation: 45 }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
+
+        function updateTable(results) {
+            let filtered = results.filter(r => r.Score > 0 || r.Nivel === "Revisión: Ambigüedad Médica");
+            if (filtered.length === 0) filtered = results;
+            
+            filtered.sort((a, b) => b.Score - a.Score);
+            
+            let html = '<table><thead><tr><th>ID</th><th>Texto</th><th>Nivel</th><th>Score</th><th>Detalles</th></tr></thead><tbody>';
+            
+            filtered.forEach(row => {
+                let rowClass = '';
+                if (row.Nivel.includes('EXTREMO')) rowClass = 'row-extremo';
+                else if (row.Nivel.includes('ALTO')) rowClass = 'row-alto';
+                else if (row.Nivel.includes('Medio')) rowClass = 'row-medio';
+                else if (row.Nivel.includes('Bajo')) rowClass = 'row-bajo';
+                else if (row.Nivel.includes('Revisión')) rowClass = 'row-revision';
+                else if (row.Nivel.includes('Descartado')) rowClass = 'row-descartado';
+                
+                html += `<tr class="${rowClass}">
+                    <td>${row.ID}</td>
+                    <td style="max-width: 400px; white-space: normal; word-wrap: break-word;">${row.Texto}</td>
+                    <td>${row.Nivel}</td>
+                    <td>${row.Score}</td>
+                    <td>${row.Detalles}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('tableContainer').innerHTML = html;
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+</body>
+</html>
