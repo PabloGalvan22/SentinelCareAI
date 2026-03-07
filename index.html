@@ -11,7 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.0.2/wordcloud2.min.js"></script>
-<!-- Añadimos Tesseract.js para OCR en imágenes -->
+<!-- Tesseract.js para OCR en imágenes -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
 <style>
@@ -287,41 +287,6 @@ body {
 }
 .step-sub { font-size:0.9rem; color:var(--text-light); margin-bottom: 24px; }
 
-/* Check-in feelings */
-.feelings-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr));
-  gap: 10px; margin-bottom: 20px;
-}
-.feeling-btn {
-  background: var(--warm-white);
-  border: 2px solid var(--border);
-  border-radius: 14px; padding: 14px 10px;
-  cursor:pointer; text-align:center;
-  transition: all 0.25s; font-family:'DM Sans',sans-serif;
-  width:100%;
-}
-.feeling-btn .feel-icon { font-size:1.8rem; display:block; margin-bottom:6px; }
-.feeling-btn .feel-label { font-size:0.8rem; color:var(--text-mid); font-weight:500; }
-.feeling-btn:hover, .feeling-btn.selected {
-  border-color: var(--teal);
-  background: rgba(61,122,138,0.08);
-  transform: translateY(-2px);
-}
-.feeling-btn.selected .feel-label { color: var(--teal); font-weight:600; }
-
-.textarea-field {
-  width:100%; padding:16px 18px;
-  background: var(--warm-white);
-  border: 1.5px solid var(--border);
-  border-radius: 14px; resize: vertical;
-  font-family: 'DM Sans', sans-serif; font-size:0.95rem;
-  color: var(--text-dark); line-height:1.6;
-  transition: border-color 0.2s;
-  min-height: 110px;
-}
-.textarea-field:focus { outline:none; border-color: var(--teal); }
-.textarea-field::placeholder { color: var(--text-light); }
-
 /* Why psych section */
 .why-grid {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -339,17 +304,6 @@ body {
 .why-item.color-purple i { color: #9664b4; }
 .why-item strong { font-size:0.92rem; display:block; margin-bottom:4px; color: var(--text-dark); }
 .why-item p { font-size:0.82rem; color: var(--text-light); line-height:1.5; }
-
-/* Response box */
-.response-box {
-  background: linear-gradient(135deg, rgba(107,143,113,0.1), rgba(61,122,138,0.08));
-  border: 1px solid rgba(107,143,113,0.3);
-  border-radius: 16px; padding: 24px;
-  margin-top: 20px; display:none;
-}
-.response-box.visible { display:block; animation: fadeIn 0.5s ease; }
-.response-box p { font-size:0.95rem; color:var(--text-dark); line-height:1.7; margin-bottom:12px; }
-.response-box p:last-child { margin:0; }
 
 /* Resources */
 .resources-grid {
@@ -907,7 +861,7 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
 </div>
 
 <!-- ══════════════════════════════════════════════
-     PANTALLA 2: PERSONAL (JOVEN / ADULTO)
+     PANTALLA 2: PERSONAL (JOVEN / ADULTO) - SIN CHECK-IN DE EMOCIONES
 ═══════════════════════════════════════════════ -->
 <div class="screen" id="s-personal">
 
@@ -947,53 +901,10 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
       <div class="crisis-phone"><i class="fas fa-phone"></i> 800 290-0024</div>
     </div>
 
-    <!-- PASO 1: CHECK-IN -->
+    <!-- PASO 1: ¿POR QUÉ UN PSICÓLOGO? -->
     <div class="step-card">
       <div class="step-title">
         <div class="step-num">1</div>
-        ¿Cómo te sientes hoy?
-      </div>
-      <p class="step-sub">Elige todo lo que aplique. No hay respuestas incorrectas.</p>
-
-      <div class="feelings-grid" id="feelings-grid">
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😔 Triste')">
-          <span class="feel-icon">😔</span><span class="feel-label">Triste</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😟 Ansioso/a')">
-          <span class="feel-icon">😟</span><span class="feel-label">Ansioso/a</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😶 Vacío/a')">
-          <span class="feel-icon">😶</span><span class="feel-label">Vacío/a</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😤 Enojado/a')">
-          <span class="feel-icon">😤</span><span class="feel-label">Enojado/a</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😔 Solo/a')">
-          <span class="feel-icon">🤍</span><span class="feel-label">Solo/a</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😩 Agotado/a')">
-          <span class="feel-icon">😩</span><span class="feel-label">Agotado/a</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'😕 Confundido/a')">
-          <span class="feel-icon">😕</span><span class="feel-label">Confundido/a</span>
-        </button>
-        <button class="feeling-btn" onclick="toggleFeeling(this,'🙂 Esperanzado/a')">
-          <span class="feel-icon">🙂</span><span class="feel-label">Con esperanza</span>
-        </button>
-      </div>
-
-      <textarea class="textarea-field" id="open-text" placeholder="Si quieres, puedes escribir algo más sobre cómo te sientes o qué está pasando…"></textarea>
-      <button class="send-btn" onclick="generateResponse()">
-        <i class="fas fa-paper-plane"></i> Recibir orientación
-      </button>
-
-      <div class="response-box" id="response-box"></div>
-    </div>
-
-    <!-- PASO 2: ¿POR QUÉ UN PSICÓLOGO? -->
-    <div class="step-card">
-      <div class="step-title">
-        <div class="step-num">2</div>
         ¿Por qué hablar con un psicólogo o psiquiatra?
       </div>
       <p class="step-sub">Muchas personas esperan "hasta estar muy mal" — pero no tienes que esperar ese momento.</p>
@@ -1022,10 +933,10 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
       </div>
     </div>
 
-    <!-- PASO 3: TESTIMONIOS -->
+    <!-- PASO 2: TESTIMONIOS -->
     <div class="step-card">
       <div class="step-title">
-        <div class="step-num">3</div>
+        <div class="step-num">2</div>
         Otros que dieron el paso
       </div>
       <p class="step-sub">No estás sol@. Muchas personas sintieron lo mismo y encontraron salida.</p>
@@ -1044,10 +955,10 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
       </div>
     </div>
 
-    <!-- PASO 4: RECURSOS -->
+    <!-- PASO 3: RECURSOS -->
     <div class="step-card">
       <div class="step-title">
-        <div class="step-num">4</div>
+        <div class="step-num">3</div>
         Líneas de apoyo y recursos
       </div>
       <p class="step-sub">Todas son gratuitas, confidenciales y disponibles ahora mismo.</p>
@@ -1096,7 +1007,7 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
 </div>
 
 <!-- ══════════════════════════════════════════════
-     PANTALLA 3: PROFESIONAL (SALUD / MAESTRO)  (con OCR mejorado)
+     PANTALLA 3: PROFESIONAL (SALUD / MAESTRO)  (con OCR para imágenes)
 ═══════════════════════════════════════════════ -->
 <div class="screen" id="s-professional">
 
@@ -1202,9 +1113,8 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
   </div>
 </div>
 
-
 <!-- ══════════════════════════════════════════════
-     PANTALLA 4: CHAT CON IA (GROQ)
+     PANTALLA 4: CHAT CON IA (GROQ) - CON REFLEJO DE EMOCIONES
 ═══════════════════════════════════════════════ -->
 <div class="screen" id="s-chat">
 
@@ -1246,14 +1156,12 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
   </div>
 </div>
 
-
 <!-- ══════════════════════════════════════════════
-     JAVASCRIPT (con soporte OCR para imágenes en sección profesional)
+     JAVASCRIPT COMPLETO Y CORREGIDO
 ═══════════════════════════════════════════════ -->
 <script>
 // ── STATE ──
 let currentProfile = null;
-let selectedFeelings = [];
 let fileData = null;
 let fileName = '';
 let results = [];
@@ -1299,69 +1207,8 @@ function goBack() {
   window.scrollTo(0, 0);
 }
 
-// ── FEELINGS ──
-function toggleFeeling(btn, label) {
-  btn.classList.toggle('selected');
-  const idx = selectedFeelings.indexOf(label);
-  if (idx === -1) selectedFeelings.push(label);
-  else selectedFeelings.splice(idx, 1);
-}
-
-// ── RESPONSE GENERATOR ──
-function generateResponse() {
-  const box = document.getElementById('response-box');
-  const openText = document.getElementById('open-text').value.trim();
-
-  const negativeSet = new Set(['😔 Triste','😟 Ansioso/a','😶 Vacío/a','😤 Enojado/a','😔 Solo/a','😩 Agotado/a','😕 Confundido/a']);
-  const negCount = selectedFeelings.filter(f => negativeSet.has(f)).length;
-  const hasHope = selectedFeelings.includes('🙂 Esperanzado/a');
-
-  let html = '';
-
-  if (selectedFeelings.length === 0 && openText.length === 0) {
-    html = `<p>Puedes seleccionar cómo te sientes o escribir algo — estamos aquí para escucharte.</p>`;
-    box.innerHTML = html;
-    box.classList.add('visible');
-    return;
-  }
-
-  // Affirm what they shared
-  if (selectedFeelings.length > 0) {
-    const feelingNames = selectedFeelings.map(f => f.split(' ').slice(1).join(' ')).join(', ');
-    html += `<p><strong>Gracias por compartir que te sientes ${feelingNames}.</strong> Reconocer lo que sientes es el primer paso más importante.</p>`;
-  }
-
-  // Check for heavy text
-  const riskWords = ['suicid', 'matar', 'morir', 'quitar', 'vida', 'daño', 'no quiero'];
-  const hasRiskText = riskWords.some(w => openText.toLowerCase().includes(w));
-
-  if (hasRiskText) {
-    html += `<p style="color:#c0392b; font-weight:600;">⚠️ Parece que estás pasando por algo muy difícil en este momento. Por favor llama ahora al <strong>800 290-0024</strong> — hay una persona real esperando escucharte, sin juzgarte, gratis.</p>`;
-  } else if (negCount >= 4) {
-    html += `<p>Cuando sentimos tantas cosas a la vez, puede ser abrumador. Lo que describes merece atención real, no solo tiempo para que pase.</p>
-    <p><strong>Hablar con un psicólogo</strong> no es para cuando ya no puedes más — es para que ese momento nunca llegue. Una primera cita puede ser el punto de quiebre hacia sentirte mejor.</p>`;
-  } else if (negCount >= 2) {
-    html += `<p>Lo que sientes tiene validez total. Muchas personas atraviesan periodos así — y la gran diferencia la hace tener con quién hablar.</p>
-    <p>Un psicólogo puede ayudarte a entender de dónde viene lo que sientes y cómo manejarlo. No tienes que resolverlo sol@.</p>`;
-  } else if (hasHope) {
-    html += `<p>¡Qué bueno que hay algo de esperanza en ti! Eso es importante. Si hay cosas que todavía te pesan, un espacio terapéutico puede ayudarte a procesar y crecer.</p>`;
-  } else {
-    html += `<p>Cuidar tu salud mental es igual de importante que cuidar tu cuerpo. Si hay algo que te inquieta, hablar con alguien de confianza — o con un profesional — siempre suma.</p>`;
-  }
-
-  html += `<p style="margin-top:14px; padding-top:14px; border-top: 1px solid rgba(107,143,113,0.2);">
-    <i class="fas fa-phone" style="color:var(--teal);"></i> &nbsp;
-    <strong>Línea de la Vida:</strong> <a href="tel:8002900024" style="color:var(--teal); font-weight:700;">800 290-0024</a> (gratuita, 24 hrs) &nbsp;·&nbsp;
-    <strong>SAPTEL:</strong> <a href="tel:5552598121" style="color:var(--teal); font-weight:700;">55 5259-8121</a>
-  </p>`;
-
-  box.innerHTML = html;
-  box.classList.add('visible');
-  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
 // ══════════════════════════════════════════════
-// DETECTOR ENGINE (original logic preserved)
+// DETECTOR ENGINE (original)
 // ══════════════════════════════════════════════
 class DetectorMotor {
   constructor() {
@@ -1505,7 +1352,7 @@ document.getElementById('proFileInput').addEventListener('change', async functio
 
   let allData = [];
 
-  // 1. Procesar archivos no-imagen (igual que antes)
+  // 1. Procesar archivos no-imagen
   for (let file of otherFiles) {
     await processNonImageFile(file, allData);
   }
@@ -1546,7 +1393,7 @@ document.getElementById('proFileInput').addEventListener('change', async functio
   showColumnSelector(fileData);
 });
 
-// Función para procesar archivos CSV/Excel/TXT (similar al original, pero agregando a allData)
+// Función para procesar archivos CSV/Excel/TXT
 function processNonImageFile(file, allData) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -1777,12 +1624,13 @@ function showNoWordCloud() {
 }
 
 // ══════════════════════════════════════════════
-// CHAT CON GROQ (sin cambios, pero se mantiene igual)
+// CHAT CON GROQ (con nuevo prompt que refleja emociones)
 // ══════════════════════════════════════════════
 const GROQ_KEY = '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';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 
+// NUEVO PROMPT: se pide explícitamente identificar y reflejar la emoción
 const SYSTEM_PROMPT = `Eres un asistente de apoyo emocional empático y cálido llamado "Aura", integrado en una plataforma de salud mental llamada "Espacio de Apoyo". Tu misión es escuchar con atención, validar emociones y orientar suavemente hacia buscar ayuda profesional cuando sea necesario.
 
 REGLAS IMPORTANTES:
@@ -1790,7 +1638,7 @@ REGLAS IMPORTANTES:
 2. Siempre recuerda al usuario que este espacio es un complemento, no reemplaza a un psicólogo o psiquiatra.
 3. Si el usuario menciona ideas suicidas, autolesiones o crisis grave, SIEMPRE incluye el número 800 290-0024 (CONASAMA, gratuito, 24h) y anímalo a llamar.
 4. Habla en español, de manera cálida, cercana y sin tecnicismos. Evita frases frías o robóticas.
-5. Valida primero, luego orienta. Nunca minimices el dolor del usuario.
+5. **Identifica y refleja la emoción principal que el usuario expresa** (tristeza, ansiedad, soledad, esperanza, etc.). Por ejemplo: "Parece que te sientes [emoción]...", "Entiendo que eso te genere [emoción]...". Valida siempre antes de orientar.
 6. Sé breve pero significativo. Máximo 3-4 párrafos por respuesta.
 7. Usa preguntas abiertas para invitar al usuario a seguir expresándose.
 8. Menciona recursos concretos de México cuando sea pertinente: CONASAMA 800 290-0024, SAPTEL 55 5259-8121, IMSS 800 623-2323.
@@ -1934,23 +1782,28 @@ async function sendMessage() {
 
   if (!text && !files.length) return;
 
+  // Mostrar mensaje del usuario
   const fileInfoDisplay = files.length
     ? (files[0].type === 'image' ? { type: 'image', data: files[0].data, name: files[0].name } : { type: 'file', name: files[0].name })
     : null;
   appendMessage('user', text || '(archivo adjunto)', fileInfoDisplay);
 
+  // Limpiar input
   input.value = '';
   input.style.height = 'auto';
   pendingFiles = [];
   renderFilePreviews();
   document.getElementById('chat-send-btn').disabled = true;
 
+  // Construir mensajes para Groq
   const groqMessages = [{ role: 'system', content: SYSTEM_PROMPT }];
 
+  // Añadir historial
   chatHistory.forEach(function(m) {
     groqMessages.push({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text });
   });
 
+  // Construir contenido del usuario actual (texto + contexto de archivos)
   let userContent = text || '';
   files.forEach(function(f) {
     if (f.type === 'text') {
@@ -1961,6 +1814,7 @@ async function sendMessage() {
   });
   groqMessages.push({ role: 'user', content: userContent });
 
+  // Guardar en historial local
   chatHistory.push({ role: 'user', text: text || '[archivo adjunto]' });
 
   appendTyping();
