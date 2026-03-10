@@ -1133,7 +1133,7 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
   cursor: pointer;
   box-shadow: 0 8px 32px rgba(192,57,43,0.55), 0 0 0 0 rgba(231,76,60,0.5);
   animation: panicPulse 2.4s ease-in-out infinite;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.25s, visibility 0.25s;
   letter-spacing: 0.01em;
 }
 #panic-btn:hover {
@@ -1149,33 +1149,31 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
   font-size: 1.1rem;
   flex-shrink: 0;
 }
+/* Oculto cuando el teclado está abierto (clase añadida por JS) */
+#panic-btn.keyboard-open {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px);
+}
 @keyframes panicPulse {
   0%, 100% { box-shadow: 0 8px 32px rgba(192,57,43,0.55), 0 0 0 0 rgba(231,76,60,0.5); }
   50%       { box-shadow: 0 8px 32px rgba(192,57,43,0.55), 0 0 0 14px rgba(231,76,60,0); }
 }
-@media(max-width:640px){
-  /* Smaller pill on mobile */
+@media(max-width:480px){
+  /* En móvil: solo icono circular, sin texto */
   #panic-btn {
-    bottom: 16px; right: 16px;
-    padding: 11px 16px 11px 12px;
-    font-size: 0.88rem; gap: 8px;
+    bottom: 20px;
+    right: 16px;
+    padding: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    justify-content: center;
   }
-  #panic-btn .panic-icon { width: 28px; height: 28px; font-size: 0.88rem; }
-
-  /* When on chat screen, lift above the input bar */
-  body.chat-active #panic-btn { bottom: 90px; }
-
-  /* When keyboard is open (user typing): shrink to icon-only circle, move out of the way */
-  body.keyboard-open #panic-btn {
-    width: 42px; height: 42px;
-    padding: 0; border-radius: 50%;
-    bottom: 10px; right: 10px;
-    gap: 0; justify-content: center;
-    opacity: 0.85;
-  }
-  body.keyboard-open #panic-btn .panic-label { display: none; }
-  body.keyboard-open #panic-btn .panic-icon {
-    width: 22px; height: 22px; font-size: 0.8rem;
+  #panic-btn .panic-label { display: none; }
+  #panic-btn .panic-icon {
+    width: 52px; height: 52px; font-size: 1.2rem;
     background: transparent;
   }
 }
@@ -1379,67 +1377,17 @@ body.dark-mode #panic-btn { box-shadow: 0 8px 32px rgba(192,57,43,0.65), 0 0 0 0
 
 /* ─── RESPONSIVE ──────────────────────────────── */
 @media(max-width:640px){
-  /* ── Landing ── */
   .profile-grid { grid-template-columns:1fr; }
-  .landing-card { padding: 28px 18px 24px; border-radius: 20px; }
-  .landing-title { font-size: 1.75rem; }
-  .landing-subtitle { font-size: 0.95rem; margin-bottom: 28px; }
-  .logo-mark { width: 56px; height: 56px; font-size: 22px; }
-  .profile-card { padding: 20px 16px; border-radius: 14px; }
-  .notice-box { font-size: 0.8rem; }
-
-  /* ── Grids ── */
+  .landing-card { padding: 36px 24px; }
   .why-grid, .resources-grid { grid-template-columns:1fr; }
   .pro-charts { grid-template-columns:1fr; }
   .guidance-grid { grid-template-columns:1fr; }
+  .app-header { padding:0 16px; }
+  .pro-container { padding: 20px 16px; }
+  .mood-selector { flex-direction: column; align-items: stretch; }
   .alert-grid { grid-template-columns: 1fr; }
   .guias-grid { grid-template-columns: 1fr; }
   .do-dont { grid-template-columns: 1fr; }
-
-  /* ── Header ── */
-  .app-header { padding: 0 12px; height: 56px; }
-  .header-brand { font-size: 0.95rem; gap: 8px; }
-  .header-dot { width: 28px; height: 28px; font-size: 12px; }
-  .header-badge { display: none; } /* hide badge on mobile to save space */
-  .btn-back { padding: 5px 10px; font-size: 0.78rem; }
-  .dark-toggle { width: 32px; height: 32px; font-size: 13px; }
-
-  /* ── Pro container ── */
-  .pro-container { padding: 16px 12px; }
-
-  /* ── Chat screen ── */
-  .chat-wrapper { padding: 0 10px 12px; }
-  .msg-bubble { max-width: 88%; font-size: 0.88rem; padding: 11px 13px; }
-  .msg-avatar { width: 28px; height: 28px; font-size: 12px; }
-  .chat-disclaimer { font-size: 0.74rem; padding: 8px 12px; }
-  .chat-input-area { border-radius: 16px; padding: 10px 10px; }
-  #chat-input { font-size: 0.9rem; }
-  .chat-btn { width: 36px; height: 36px; font-size: 14px; }
-  .chat-btn-mic { width: 36px; height: 36px; font-size: 13px; }
-  .voice-bar { font-size: 0.7rem; }
-
-  /* ── Chat CTA card ── */
-  .chat-cta { flex-direction: column; text-align: center; padding: 20px 18px; gap: 14px; }
-  .chat-cta-arrow { display: none; }
-  .chat-cta-text h4 { font-size: 1rem; }
-  .chat-cta-text p { font-size: 0.82rem; }
-
-  /* ── Personal hero ── */
-  .personal-hero { padding: 24px 16px 0; }
-  .personal-hero h2 { font-size: 1.5rem; }
-  .personal-content { padding: 0 14px; margin-top: 24px; }
-
-  /* ── Padres ── */
-  .padres-content { padding: 0 14px; }
-  .padres-section { padding: 20px 16px; }
-
-  /* ── Mood selector ── */
-  .mood-selector { flex-direction: column; align-items: stretch; }
-  .mood-btn { padding: 10px; }
-
-  /* ── Pro access card ── */
-  .pro-access-card { padding: 36px 22px 30px; border-radius: 22px; }
-  .pro-access-title { font-size: 1.4rem; }
 }
 
 /* ─── PANTALLA DE ACCESO PROFESIONAL ─────────── */
@@ -1957,6 +1905,54 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
   .msg-bubble { max-width: 88%; }
   .chat-cta { flex-direction:column; text-align:center; }
   .chat-cta-arrow { display:none; }
+}
+
+/* ─── MEJORAS MÓVILES GENERALES ─────────────── */
+@media(max-width:640px){
+
+  /* Landing */
+  .landing-card { padding: 28px 18px 32px; border-radius: 24px; }
+  .landing-title { font-size: 2rem; }
+  .landing-subtitle { font-size: 0.88rem; }
+  .profile-btn { padding: 14px 16px; font-size: 0.88rem; }
+  .profile-icon { width: 42px; height: 42px; font-size: 1.1rem; }
+
+  /* App header en móvil */
+  .app-header { padding: 0 12px; height: 56px; }
+  .app-header h2 { font-size: 0.88rem; }
+  .header-dot { width: 30px; height: 30px; font-size: 0.8rem; }
+
+  /* Chat — input más accesible */
+  .chat-input-area { border-radius: 18px; padding: 10px 12px; }
+  #chat-input { font-size: 16px; } /* 16px evita zoom automático en iOS */
+  .chat-btn { width: 38px; height: 38px; font-size: 15px; }
+
+  /* Mensajes */
+  .msg-bubble { font-size: 0.9rem; padding: 11px 14px; border-radius: 18px; }
+  .msg-avatar { width: 28px; height: 28px; font-size: 0.75rem; }
+
+  /* Panel profesional */
+  .pro-container { padding: 14px 12px; }
+  .pro-tab-bar { gap: 4px; }
+  .pro-tab-btn { padding: 8px 12px; font-size: 0.78rem; }
+
+  /* Pantalla personal / padres */
+  .personal-container, .padres-container { padding: 16px 14px; }
+  .resource-card { padding: 16px 14px; }
+
+  /* Acceso profesional */
+  .pro-access-card { padding: 36px 24px 32px; border-radius: 22px; }
+}
+
+/* Prevenir zoom en inputs iOS sin romper tamaño visual */
+@media(max-width:640px){
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 </style>
 </head>
@@ -2986,6 +2982,47 @@ function updateCharCount(el) {
   counter.className = 'char-counter' + (len >= MAX_CHARS ? ' limit' : len > MAX_CHARS * 0.8 ? ' warn' : '');
   if (len > MAX_CHARS) el.value = el.value.slice(0, MAX_CHARS);
 }
+
+// ══════════════════════════════════════════════
+// OPTIMIZACIÓN MÓVIL — TECLADO VIRTUAL
+// ══════════════════════════════════════════════
+(function initMobileKeyboardHandling() {
+  const panicBtn = document.getElementById('panic-btn');
+  if (!panicBtn) return;
+
+  // Método 1: visualViewport API (Chrome/Safari móvil modernos)
+  if (window.visualViewport) {
+    const KEYBOARD_THRESHOLD = 0.75; // Si el viewport baja a <75% de la pantalla → teclado abierto
+    window.visualViewport.addEventListener('resize', () => {
+      const ratio = window.visualViewport.height / window.screen.height;
+      if (ratio < KEYBOARD_THRESHOLD) {
+        panicBtn.classList.add('keyboard-open');
+      } else {
+        panicBtn.classList.remove('keyboard-open');
+      }
+    });
+  }
+
+  // Método 2: focus/blur en todos los inputs y textareas (fallback)
+  document.addEventListener('focusin', (e) => {
+    if (e.target.matches('input, textarea, [contenteditable]')) {
+      // Solo en móvil (pantalla estrecha)
+      if (window.innerWidth <= 768) {
+        panicBtn.classList.add('keyboard-open');
+      }
+    }
+  });
+  document.addEventListener('focusout', (e) => {
+    if (e.target.matches('input, textarea, [contenteditable]')) {
+      // Pequeño delay para que visualViewport tenga tiempo de actualizarse
+      setTimeout(() => {
+        if (!document.activeElement.matches('input, textarea, [contenteditable]')) {
+          panicBtn.classList.remove('keyboard-open');
+        }
+      }, 150);
+    }
+  });
+})();
 
 // ══════════════════════════════════════════════
 // MODO OFFLINE COMPLETO — RESPUESTAS PRE-PROGRAMADAS DE AURA
@@ -4779,56 +4816,6 @@ async function sendMessage() {
 
   document.getElementById('chat-send-btn').disabled = false;
 }
-
-// ══════════════════════════════════════════════
-// OPTIMIZACIÓN MÓVIL — TECLADO Y BOTÓN DE PÁNICO
-// ══════════════════════════════════════════════
-(function initMobileOptimizations() {
-
-  // ── Detectar cuando el teclado virtual sube (viewport shrinks) ──
-  const KEYBOARD_THRESHOLD = 150; // px de diferencia para considerar que el teclado subió
-  let lastViewportHeight = window.innerHeight;
-
-  function onViewportResize() {
-    const currentHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const diff = lastViewportHeight - currentHeight;
-    if (diff > KEYBOARD_THRESHOLD) {
-      document.body.classList.add('keyboard-open');
-    } else {
-      document.body.classList.remove('keyboard-open');
-    }
-  }
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', onViewportResize);
-  } else {
-    window.addEventListener('resize', onViewportResize);
-  }
-
-  // ── Marcar body cuando está activa la pantalla de chat ──
-  const chatObserver = new MutationObserver(() => {
-    const chatScreen = document.getElementById('s-chat');
-    if (chatScreen && chatScreen.classList.contains('active')) {
-      document.body.classList.add('chat-active');
-    } else {
-      document.body.classList.remove('chat-active');
-    }
-  });
-
-  chatObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
-
-  // ── Scroll suave al abrir teclado en el chat (iOS fix) ──
-  const chatInput = document.getElementById('chat-input');
-  if (chatInput) {
-    chatInput.addEventListener('focus', () => {
-      setTimeout(() => {
-        const msgs = document.getElementById('chat-messages');
-        if (msgs) msgs.scrollTop = msgs.scrollHeight;
-      }, 350);
-    });
-  }
-
-})();
 </script>
 
 <!-- ══════════════════════════════════════════════
