@@ -33,6 +33,8 @@
   --border: rgba(107,143,113,0.2);
   --shadow: 0 8px 32px rgba(61,122,138,0.12);
   --shadow-hover: 0 16px 48px rgba(61,122,138,0.22);
+  --lavender: #9b8bb4;
+  --lavender-light: #c5b9da;
 }
 
 /* ─── DARK MODE OVERRIDES ─────────────────────── */
@@ -120,6 +122,25 @@ body {
 .bg-blob-3 { width:400px; height:400px; background:radial-gradient(circle, var(--gold-light), transparent); top:40%; left:40%; animation: blobFloat 18s ease-in-out 6s infinite alternate; }
 
 @keyframes blobFloat { 0%{transform:translate(0,0) scale(1);} 100%{transform:translate(30px,40px) scale(1.08);} }
+
+/* ─── OFFLINE BANNER ──────────────────────────── */
+#offline-banner {
+  display: none;
+  background: linear-gradient(90deg, #b7601a, #e67e22);
+  color: white;
+  text-align: center;
+  padding: 9px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20000;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  letter-spacing: 0.01em;
+}
+#offline-banner i { margin-right: 6px; }
 
 /* ─── SCREENS ─────────────────────────────────── */
 .screen { display:none; min-height:100vh; position:relative; z-index:1; }
@@ -214,6 +235,7 @@ body {
 .profile-card.adulto::before  { background: linear-gradient(135deg, rgba(61,122,138,0.08), rgba(126,184,196,0.12)); }
 .profile-card.salud::before   { background: linear-gradient(135deg, rgba(200,151,74,0.08), rgba(232,196,138,0.12)); }
 .profile-card.maestro::before { background: linear-gradient(135deg, rgba(150,100,180,0.08), rgba(200,160,220,0.12)); }
+.profile-card.padre::before   { background: linear-gradient(135deg, rgba(155,139,180,0.12), rgba(197,185,218,0.12)); }
 
 .profile-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
 .profile-card:hover::before { opacity:1; }
@@ -230,6 +252,7 @@ body {
 .adulto .profile-icon  { background: rgba(61,122,138,0.15);  color: var(--teal); }
 .salud .profile-icon   { background: rgba(200,151,74,0.15);  color: var(--gold); }
 .maestro .profile-icon { background: rgba(150,100,180,0.15); color: #9664b4; }
+.padre .profile-icon   { background: rgba(155,139,180,0.2);  color: #7a5f9e; }
 
 .profile-name {
   font-family: 'Playfair Display', serif;
@@ -433,6 +456,322 @@ body {
   font-family:'DM Sans',sans-serif;
 }
 .send-btn:hover { transform:translateY(-2px); box-shadow: 0 6px 20px rgba(61,122,138,0.35); }
+
+/* ─── BIENESTAR: HISTORIAL EMOCIONAL ──────────── */
+.wellness-tracker {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 30px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+.wellness-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wellness-title i { color: var(--teal); }
+.mood-selector {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0 30px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mood-btn {
+  background: var(--warm-white);
+  border: 2px solid var(--border);
+  border-radius: 60px;
+  padding: 14px 20px;
+  font-size: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.25s;
+  min-width: 100px;
+  flex: 1 1 auto;
+}
+.mood-btn:hover {
+  transform: translateY(-4px);
+  border-color: var(--teal);
+  box-shadow: var(--shadow);
+}
+.mood-btn span {
+  font-size: 0.85rem;
+  margin-top: 6px;
+  font-weight: 500;
+  color: var(--text-mid);
+}
+.mood-btn.selected {
+  border-color: var(--teal);
+  background: rgba(61,122,138,0.1);
+}
+.mood-btn .mood-emoji { font-size: 2rem; line-height: 1; }
+.wellness-chart-container {
+  margin-top: 20px;
+  height: 220px;
+  position: relative;
+}
+.wellness-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-light);
+  background: rgba(61,122,138,0.05);
+  border-radius: 18px;
+}
+.wellness-empty i { font-size: 2.5rem; margin-bottom: 12px; color: var(--teal-light); }
+.wellness-empty p { font-size: 0.9rem; }
+
+/* ─── SCREEN 5: PADRES DE FAMILIA ─────────────── */
+#s-padres {
+  background: linear-gradient(135deg, #f5f0fa 0%, #ede7f5 100%);
+  padding-bottom: 60px;
+}
+body.dark-mode #s-padres {
+  background: linear-gradient(135deg, #1a1625 0%, #231f30 100%);
+}
+.padres-hero {
+  padding: 48px 24px 0;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+.padres-hero h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 14px;
+  line-height: 1.2;
+}
+.padres-hero p {
+  font-size: 1.05rem;
+  color: var(--text-mid);
+  line-height: 1.75;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.padres-content {
+  max-width: 900px;
+  margin: 40px auto 0;
+  padding: 0 24px;
+}
+.padres-section {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: var(--shadow);
+}
+.padres-section h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.padres-section h3 i { color: var(--lavender); }
+.alert-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.alert-card {
+  background: var(--warm-white);
+  border-radius: 16px;
+  padding: 18px;
+  border-left: 6px solid transparent;
+}
+.alert-card.roja { border-left-color: #c0392b; background: rgba(192,57,43,0.05); }
+.alert-card.amarilla { border-left-color: #e67e22; background: rgba(230,126,34,0.05); }
+.alert-card.verde { border-left-color: #27ae60; background: rgba(39,174,96,0.05); }
+.alert-card h4 {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  color: var(--text-dark);
+}
+.alert-card ul {
+  padding-left: 18px;
+  font-size: 0.88rem;
+  color: var(--text-mid);
+  line-height: 1.7;
+}
+.guias-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 10px;
+}
+.guia-item {
+  background: rgba(155,139,180,0.08);
+  border-radius: 14px;
+  padding: 18px;
+  border: 1px solid rgba(155,139,180,0.2);
+}
+.guia-item strong {
+  display: block;
+  color: var(--lavender);
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+.guia-item p {
+  font-size: 0.9rem;
+  color: var(--text-mid);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.guia-item .frase {
+  background: var(--warm-white);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-style: italic;
+  border-left: 3px solid var(--lavender);
+  margin-top: 8px;
+}
+.guia-item .frase i { color: var(--lavender); margin-right: 5px; }
+.do-dont {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.do-card, .dont-card {
+  padding: 18px;
+  border-radius: 14px;
+}
+.do-card {
+  background: rgba(39,174,96,0.08);
+  border: 1px solid rgba(39,174,96,0.2);
+}
+.dont-card {
+  background: rgba(192,57,43,0.08);
+  border: 1px solid rgba(192,57,43,0.2);
+}
+.do-card h4, .dont-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+.do-card h4 i { color: #27ae60; }
+.dont-card h4 i { color: #c0392b; }
+.do-card ul, .dont-card ul {
+  padding-left: 18px;
+  font-size: 0.88rem;
+  color: var(--text-mid);
+  line-height: 1.7;
+}
+.autocuidado {
+  background: rgba(61,122,138,0.05);
+  border-radius: 16px;
+  padding: 22px;
+  margin: 15px 0;
+}
+.autocuidado h4 {
+  color: var(--teal);
+  font-size: 1rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.autocuidado p {
+  font-size: 0.9rem;
+  color: var(--text-mid);
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+.accordion-item {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.accordion-header {
+  padding: 18px 22px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(155,139,180,0.05);
+}
+.accordion-header i { color: var(--lavender); transition: transform 0.2s; }
+.accordion-header.active i { transform: rotate(90deg); }
+.accordion-content {
+  max-height: 0;
+  padding: 0 22px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background: var(--warm-white);
+}
+.accordion-content.active {
+  max-height: 500px;
+  padding: 18px 22px;
+}
+.accordion-content p {
+  font-size: 0.9rem;
+  color: var(--text-mid);
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+.accordion-content .pregunta {
+  background: rgba(61,122,138,0.05);
+  border-radius: 10px;
+  padding: 12px 15px;
+  margin: 8px 0;
+  font-style: italic;
+}
+.accordion-content .pregunta i { color: var(--teal); margin-right: 6px; }
+.chat-parent-cta {
+  background: linear-gradient(135deg, var(--lavender), #7a5f9e);
+  color: white;
+  border: none;
+  border-radius: 18px;
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 30px 0 10px;
+}
+.chat-parent-cta:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(122,95,158,0.35);
+}
+.chat-parent-cta-icon {
+  width: 56px; height: 56px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--lavender);
+}
+.chat-parent-cta-text h4 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chat-parent-cta-text p { font-size: 0.9rem; opacity: 0.9; }
+.chat-parent-cta-arrow { margin-left: auto; font-size: 1.5rem; }
 
 /* ─── SCREEN 3: PROFESSIONAL ──────────────────── */
 #s-professional {
@@ -774,6 +1113,233 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
 .crisis-banner span { font-size:0.85rem; color:var(--text-mid); line-height:1.5; }
 .crisis-phone { font-size:1.3rem; font-weight:700; color:var(--red-alert); white-space:nowrap; margin-left:auto; }
 
+/* ─── PANIC BUTTON (FIXED, ALL SCREENS) ─────────── */
+#panic-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 15px 24px 15px 18px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(192,57,43,0.55), 0 0 0 0 rgba(231,76,60,0.5);
+  animation: panicPulse 2.4s ease-in-out infinite;
+  transition: transform 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.01em;
+}
+#panic-btn:hover {
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 12px 40px rgba(192,57,43,0.7), 0 0 0 8px rgba(231,76,60,0.15);
+  animation: none;
+}
+#panic-btn .panic-icon {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,0.22);
+  border-radius: 50%;
+  display: flex; align-items:center; justify-content:center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+@keyframes panicPulse {
+  0%, 100% { box-shadow: 0 8px 32px rgba(192,57,43,0.55), 0 0 0 0 rgba(231,76,60,0.5); }
+  50%       { box-shadow: 0 8px 32px rgba(192,57,43,0.55), 0 0 0 14px rgba(231,76,60,0); }
+}
+@media(max-width:480px){
+  #panic-btn { bottom:16px; right:16px; padding:13px 18px 13px 14px; font-size:0.92rem; }
+  #panic-btn .panic-icon { width:30px; height:30px; font-size:0.95rem; }
+}
+
+/* ─── CRISIS OVERLAY (FULL SCREEN) ──────────────── */
+#crisis-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: linear-gradient(160deg, #1a0a0a 0%, #2d0f0f 40%, #1e1020 100%);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  animation: crisisIn 0.35s cubic-bezier(0.4,0,0.2,1);
+  overflow-y: auto;
+}
+#crisis-overlay.active { display: flex; }
+@keyframes crisisIn {
+  from { opacity:0; transform: scale(0.97); }
+  to   { opacity:1; transform: scale(1); }
+}
+
+.crisis-overlay-inner {
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+}
+
+/* Aura avatar in crisis */
+.crisis-aura {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c0392b, #9b59b6);
+  display: flex; align-items:center; justify-content:center;
+  margin: 0 auto 20px;
+  font-size: 32px;
+  box-shadow: 0 0 40px rgba(192,57,43,0.45), 0 0 80px rgba(155,89,182,0.2);
+  animation: auraPulse 2.5s ease-in-out infinite;
+}
+@keyframes auraPulse {
+  0%,100% { box-shadow: 0 0 40px rgba(192,57,43,0.4), 0 0 80px rgba(155,89,182,0.15); }
+  50%     { box-shadow: 0 0 60px rgba(192,57,43,0.6), 0 0 100px rgba(155,89,182,0.3); }
+}
+
+.crisis-headline {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+.crisis-subline {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.7;
+  margin-bottom: 8px;
+  max-width: 420px;
+  margin-left: auto; margin-right: auto;
+}
+
+/* Aura's calming message bubble */
+.crisis-aura-msg {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 18px 18px 18px 4px;
+  padding: 18px 22px;
+  margin: 20px 0 28px;
+  text-align: left;
+  position: relative;
+}
+.crisis-aura-msg::before {
+  content: 'Aura';
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(200,130,130,0.9);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.crisis-aura-msg p {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.9);
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* Phone call cards */
+.crisis-phones {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.crisis-call-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.14);
+  border-radius: 16px;
+  padding: 16px 20px;
+  text-decoration: none;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.crisis-call-card::before {
+  content:'';
+  position: absolute; inset:0;
+  background: linear-gradient(90deg, rgba(231,76,60,0.08), transparent);
+  opacity:0;
+  transition: opacity 0.2s;
+}
+.crisis-call-card:hover { border-color: rgba(231,76,60,0.6); transform: translateX(4px); }
+.crisis-call-card:hover::before { opacity:1; }
+
+.crisis-call-icon {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  display: flex; align-items:center; justify-content:center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.crisis-call-icon.red    { background: rgba(192,57,43,0.25); color: #ff6b5b; }
+.crisis-call-icon.teal   { background: rgba(61,122,138,0.25); color: #7eb8c4; }
+.crisis-call-icon.green  { background: rgba(39,174,96,0.22);  color: #6fbf73; }
+
+.crisis-call-info { flex: 1; text-align: left; }
+.crisis-call-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.crisis-call-number {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.crisis-call-number.red   { color: #ff6b5b; }
+.crisis-call-number.teal  { color: #7eb8c4; }
+.crisis-call-number.green { color: #6fbf73; }
+.crisis-call-desc {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.45);
+  margin-top: 2px;
+}
+
+.crisis-call-btn {
+  display: flex; align-items:center; gap:6px;
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: white; border: none; border-radius: 10px;
+  padding: 10px 16px; font-family:'DM Sans',sans-serif;
+  font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; white-space: nowrap; flex-shrink:0;
+  text-decoration: none;
+}
+.crisis-call-btn:hover { box-shadow: 0 4px 16px rgba(192,57,43,0.5); transform: scale(1.04); }
+.crisis-call-btn.teal-btn  { background: linear-gradient(135deg, #2e7d8a, #3d9aad); }
+.crisis-call-btn.teal-btn:hover { box-shadow: 0 4px 16px rgba(61,122,138,0.5); }
+.crisis-call-btn.green-btn { background: linear-gradient(135deg, #1f8a4c, #27ae60); }
+.crisis-call-btn.green-btn:hover { box-shadow: 0 4px 16px rgba(39,174,96,0.5); }
+
+/* Close/dismiss */
+.crisis-close-row {
+  display: flex; justify-content:center;
+}
+.crisis-close-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  padding: 10px 22px;
+  color: rgba(255,255,255,0.45);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.crisis-close-btn:hover { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.7); }
+
+body.dark-mode #panic-btn { box-shadow: 0 8px 32px rgba(192,57,43,0.65), 0 0 0 0 rgba(231,76,60,0.6); }
+
 /* ─── TESTIMONIALS (for personal) ───────────────── */
 .quote-card {
   background: linear-gradient(135deg, rgba(61,122,138,0.06), rgba(107,143,113,0.04));
@@ -798,6 +1364,10 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
   .guidance-grid { grid-template-columns:1fr; }
   .app-header { padding:0 16px; }
   .pro-container { padding: 20px 16px; }
+  .mood-selector { flex-direction: column; align-items: stretch; }
+  .alert-grid { grid-template-columns: 1fr; }
+  .guias-grid { grid-template-columns: 1fr; }
+  .do-dont { grid-template-columns: 1fr; }
 }
 
 /* ─── CHAT BUTTON IN PERSONAL ─────────────────── */
@@ -828,6 +1398,86 @@ td { padding:11px 15px; border-bottom:1px solid rgba(0,212,255,0.12); font-size:
 }
 .chat-cta-text p { font-size:0.875rem; color:var(--text-mid); line-height:1.5; }
 .chat-cta-arrow { margin-left:auto; color:var(--teal); font-size:1.2rem; }
+
+/* ─── SESSION PERSISTENCE UI ─────────────────── */
+.session-restore-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(61,122,138,0.07);
+  border: 1px solid rgba(61,122,138,0.18);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--text-mid);
+  animation: fadeIn 0.4s ease;
+  flex-wrap: wrap;
+}
+.session-restore-bar i { color: var(--teal); margin-right: 5px; }
+.session-restore-bar strong { color: var(--text-dark); }
+.session-restore-actions { display:flex; gap:8px; flex-shrink:0; }
+.session-restore-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  color: var(--text-mid);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.session-restore-btn:hover { border-color: var(--teal); color: var(--teal); background: rgba(61,122,138,0.06); }
+.session-restore-btn.danger:hover { border-color: var(--red-alert); color: var(--red-alert); background: rgba(192,57,43,0.06); }
+
+/* Date separator inside chat */
+.chat-date-sep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 10px;
+  color: var(--text-light);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.chat-date-sep::before,
+.chat-date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Saved-session pill in chat header */
+.session-saved-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  color: var(--sage);
+  background: rgba(107,143,113,0.1);
+  border: 1px solid rgba(107,143,113,0.22);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  transition: opacity 0.4s;
+}
+.session-saved-pill i { font-size: 0.65rem; }
+.session-saved-pill.flash { animation: pillFlash 0.7s ease; }
+@keyframes pillFlash {
+  0%,100% { background: rgba(107,143,113,0.1); }
+  40%     { background: rgba(107,143,113,0.28); }
+}
+
+body.dark-mode .session-restore-bar  { background: rgba(61,122,138,0.1); border-color: rgba(61,122,138,0.22); }
+body.dark-mode .session-saved-pill   { background: rgba(107,143,113,0.15); }
 
 /* ─── SCREEN 4: CHAT ───────────────────────────── */
 #s-chat {
@@ -1141,6 +1791,12 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
 <div class="bg-blob bg-blob-2"></div>
 <div class="bg-blob bg-blob-3"></div>
 
+<!-- OFFLINE BANNER -->
+<div id="offline-banner">
+  <i class="fas fa-wifi-slash"></i>
+  <strong>Sin conexión</strong> — El chat funciona en modo local con respuestas de Aura pre-programadas. Las llamadas de voz y análisis no están disponibles.
+</div>
+
 <!-- ══════════════════════════════════════════════
      PANTALLA 1: BIENVENIDA / REGISTRO
 ═══════════════════════════════════════════════ -->
@@ -1179,6 +1835,11 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
         <div class="profile-name">Maestro / Educador</div>
         <div class="profile-desc">Docente que desea identificar señales de alerta en su grupo</div>
       </div>
+      <div class="profile-card padre" onclick="enterApp('padre')">
+        <div class="profile-icon"><i class="fas fa-home"></i></div>
+        <div class="profile-name">Padre / Madre de Familia</div>
+        <div class="profile-desc">Quieres apoyar a tu hija/o y saber cómo actuar ante señales de alerta</div>
+      </div>
     </div>
 
     <div class="notice-box">
@@ -1195,7 +1856,7 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
 </div>
 
 <!-- ══════════════════════════════════════════════
-     PANTALLA 2: PERSONAL (JOVEN / ADULTO) - SIN CHECK-IN DE EMOCIONES
+     PANTALLA 2: PERSONAL (JOVEN / ADULTO) - CON HISTORIAL DE BIENESTAR
 ═══════════════════════════════════════════════ -->
 <div class="screen" id="s-personal">
 
@@ -1334,6 +1995,46 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
       </div>
     </div>
 
+    <!-- NUEVO: HISTORIAL DE BIENESTAR -->
+    <div class="wellness-tracker">
+      <div class="wellness-title">
+        <i class="fas fa-chart-line"></i> ¿Cómo te has sentido estos días?
+      </div>
+      <p style="color: var(--text-mid); margin-bottom: 10px;">Selecciona cómo te sientes hoy y observa tu evolución.</p>
+      <div class="mood-selector" id="mood-selector">
+        <div class="mood-btn" data-value="5" onclick="selectMood(5)">
+          <span class="mood-emoji">😊</span>
+          <span>Muy bien</span>
+        </div>
+        <div class="mood-btn" data-value="4" onclick="selectMood(4)">
+          <span class="mood-emoji">🙂</span>
+          <span>Bien</span>
+        </div>
+        <div class="mood-btn" data-value="3" onclick="selectMood(3)">
+          <span class="mood-emoji">😐</span>
+          <span>Regular</span>
+        </div>
+        <div class="mood-btn" data-value="2" onclick="selectMood(2)">
+          <span class="mood-emoji">😞</span>
+          <span>Mal</span>
+        </div>
+        <div class="mood-btn" data-value="1" onclick="selectMood(1)">
+          <span class="mood-emoji">😢</span>
+          <span>Muy mal</span>
+        </div>
+      </div>
+
+      <div class="wellness-chart-container">
+        <canvas id="moodChart" style="width:100%; height:100%;"></canvas>
+      </div>
+
+      <!-- Mensaje si no hay datos -->
+      <div id="moodEmptyMessage" class="wellness-empty" style="display: none;">
+        <i class="fas fa-smile-wink"></i>
+        <p>Todavía no has registrado ningún estado. Empieza seleccionando cómo te sientes hoy.</p>
+      </div>
+    </div>
+
     <!-- CTA FINAL -->
     <div class="courage-section">
       <h3>Dar el primer paso es lo más difícil</h3>
@@ -1344,6 +2045,198 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
       <a href="tel:8002900024" class="btn-primary">
         <i class="fas fa-phone-flip"></i> Llamar ahora: 800 290-0024
       </a>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PANTALLA 5: PADRES DE FAMILIA
+═══════════════════════════════════════════════ -->
+<div class="screen" id="s-padres">
+
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="header-dot"><i class="fas fa-heart"></i></div>
+      SentinelCareAI
+    </div>
+    <span class="header-badge" style="background:rgba(155,139,180,0.15);color:#7a5f9e;">Guía para Padres</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="dark-toggle" onclick="toggleDark()" title="Modo oscuro"><i class="fas fa-moon"></i></button>
+      <button class="btn-back" onclick="goBack()"><i class="fas fa-arrow-left"></i> Volver</button>
+    </div>
+  </header>
+
+  <div class="padres-hero">
+    <h2>Apoyar a tu hija/o es el primer paso</h2>
+    <p>Como madre o padre, a veces no sabemos cómo reaccionar o qué decir. Aquí encontrarás orientación clara, basada en recomendaciones de expertos, para hablar con tu hijo/a y saber cuándo buscar ayuda profesional.</p>
+  </div>
+
+  <div class="padres-content">
+
+    <!-- Sección 1: Señales de alerta (semáforo) -->
+    <div class="padres-section">
+      <h3><i class="fas fa-exclamation-triangle"></i> Señales de alerta</h3>
+      <div class="alert-grid">
+        <div class="alert-card roja">
+          <h4>🔴 Requieren acción inmediata</h4>
+          <ul>
+            <li>Habla de querer morirse o hacerse daño</li>
+            <li>Busca medios para lastimarse (pastillas, objetos)</li>
+            <li>Se despide como si no fuera a volver a verte</li>
+            <li>Regala sus pertenencias favoritas</li>
+            <li>Ha tenido intentos previos de autolesión</li>
+          </ul>
+        </div>
+        <div class="alert-card amarilla">
+          <h4>🟡 Preocupación moderada</h4>
+          <ul>
+            <li>Aislamiento prolongado (no sale de su habitación)</li>
+            <li>Cambios bruscos de humor o irritabilidad</li>
+            <li>Abandono de actividades que antes disfrutaba</li>
+            <li>Bajo rendimiento escolar repentino</li>
+            <li>Comentarios como "nada tiene sentido" o "soy una carga"</li>
+          </ul>
+        </div>
+        <div class="alert-card verde">
+          <h4>🟢 Observación y diálogo</h4>
+          <ul>
+            <li>Tristeza ocasional pero se recupera</li>
+            <li>Quejas sobre el estrés escolar o social</li>
+            <li>Pasa mucho tiempo en redes pero sin aislamiento total</li>
+            <li>Se muestra más callado de lo habitual</li>
+            <li>Cambios leves en hábitos de sueño o alimentación</li>
+          </ul>
+        </div>
+      </div>
+      <p style="font-size:0.85rem;color:var(--text-light);margin-top:12px;"><i class="fas fa-info-circle"></i> Si observas varias señales rojas o amarillas persistentes, busca ayuda profesional de inmediato.</p>
+    </div>
+
+    <!-- Sección 2: Cómo iniciar conversaciones difíciles (guiones) -->
+    <div class="padres-section">
+      <h3><i class="fas fa-comments"></i> Cómo iniciar conversaciones difíciles</h3>
+      <p style="margin-bottom:20px;">Usa estas frases como guía, adaptándolas a tu estilo y a la relación con tu hijo/a.</p>
+      <div class="guias-grid">
+        <div class="guia-item">
+          <strong>Para abrir la conversación</strong>
+          <p>"Últimamente te noto diferente, más callado. Quiero que sepas que estoy aquí para lo que necesites, sin juzgarte."</p>
+          <div class="frase"><i class="fas fa-quote-left"></i> "¿Hay algo de lo que quieras hablar? A veces contar las cosas ayuda a que pesen menos."</div>
+        </div>
+        <div class="guia-item">
+          <strong>Si notas tristeza o aislamiento</strong>
+          <p>"He notado que ya no te juntas con tus amigos como antes, y te veo más apagado. ¿Te está pasando algo que quieras compartir?"</p>
+          <div class="frase"><i class="fas fa-quote-left"></i> "A veces los papás no entendemos todo, pero quiero entenderte. Cuéntame cómo te sientes."</div>
+        </div>
+        <div class="guia-item">
+          <strong>Para preguntar directamente sobre ideas suicidas</strong>
+          <p>Si ya hay señales de alerta, preguntar no aumenta el riesgo, al contrario, muestra que te importa.</p>
+          <div class="frase"><i class="fas fa-quote-left"></i> "¿Has tenido pensamientos de hacerte daño o de que la vida ya no vale la pena?"</div>
+          <div class="frase"><i class="fas fa-quote-left"></i> "A veces cuando uno se siente muy mal, piensa en desaparecer. ¿A ti te ha pasado?"</div>
+        </div>
+        <div class="guia-item">
+          <strong>Sobre el uso de redes sociales</strong>
+          <p>"Noto que pasas mucho tiempo en el teléfono y a veces te veo mal después. ¿Hay algo que pase en redes que te afecte?"</p>
+          <div class="frase"><i class="fas fa-quote-left"></i> "Si alguien te está haciendo sentir mal por internet, quiero que lo sepas, podemos buscar ayuda."</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sección 3: Qué NO decir y alternativas -->
+    <div class="padres-section">
+      <h3><i class="fas fa-ban"></i> Qué evitar y cómo decirlo mejor</h3>
+      <div class="do-dont">
+        <div class="dont-card">
+          <h4><i class="fas fa-times-circle"></i> Frases que pueden empeorar</h4>
+          <ul>
+            <li>"No es para tanto, hay gente que la pasa peor."</li>
+            <li>"Son cosas de tu edad, ya se te pasará."</li>
+            <li>"Solo quieres llamar la atención."</li>
+            <li>"Si sigues así, vas a terminar en el psiquiátrico."</li>
+            <li>"Dios no da cargas que no podamos soportar." (minimiza)</li>
+            <li>"Déjame tus cosas, yo sé lo que necesitas."</li>
+          </ul>
+        </div>
+        <div class="do-card">
+          <h4><i class="fas fa-check-circle"></i> Alternativas recomendadas</h4>
+          <ul>
+            <li>"Lo que sientes es válido, y estoy aquí para ti."</li>
+            <li>"Cuéntame más, quiero entender cómo te sientes."</li>
+            <li>"Gracias por confiar en mí. No estás solo/a."</li>
+            <li>"Vamos a buscar juntos a alguien que pueda ayudarnos."</li>
+            <li>"No tengo todas las respuestas, pero juntos podemos encontrar apoyo."</li>
+            <li>"Tu bienestar es lo más importante para mí."</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sección 4: Autocuidado del padre/madre -->
+    <div class="padres-section">
+      <h3><i class="fas fa-heart"></i> Autocuidado para ti también</h3>
+      <div class="autocuidado">
+        <h4><i class="fas fa-leaf"></i> Para poder apoyar, necesitas estar bien</h4>
+        <p>✔️ Busca tu propia red de apoyo: otros padres, amigos, grupos de ayuda.</p>
+        <p>✔️ Permítete sentir: miedo, frustración, tristeza. No eres una máquina.</p>
+        <p>✔️ Si te sientes abrumado, considera hablar con un profesional para ti.</p>
+        <p>✔️ Recuerda que no eres responsable de todo; el bienestar de tu hijo/a es un trabajo en equipo.</p>
+        <p>✔️ Respira. Esto es un proceso, no ocurre de la noche a la mañana.</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:15px;">
+        <a href="tel:8002222268" class="resource-chip" style="background:rgba(61,122,138,0.1);"><i class="fas fa-phone"></i> DIF Nacional 800 222-2268</a>
+        <a href="tel:8002900024" class="resource-chip" style="background:rgba(61,122,138,0.1);"><i class="fas fa-phone"></i> CONASAMA 800 290-0024</a>
+      </div>
+    </div>
+
+    <!-- Acordeón de escenarios específicos -->
+    <div class="padres-section">
+      <h3><i class="fas fa-chevron-circle-down"></i> Escenarios específicos</h3>
+      <div class="accordion-item">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <i class="fas fa-chevron-right"></i> Tristeza prolongada o aislamiento
+        </div>
+        <div class="accordion-content">
+          <p><strong>¿Qué hacer?</strong> Acércate con calma, sin presionar. Puedes decir: "He notado que pasas mucho tiempo solo/a, ¿quieres contarme algo?"</p>
+          <p>✔️ Pregunta si hay algo específico que le preocupa (escuela, amigos, familia).</p>
+          <p>✔️ Valida su emoción: "Entiendo que a veces uno necesita estar solo, pero también quiero que sepas que estoy aquí."</p>
+          <p>✔️ Si el aislamiento dura más de dos semanas, consulta con el orientador escolar o un psicólogo.</p>
+          <div class="pregunta"><i class="fas fa-comment-dots"></i> "¿Hay algo que haya pasado en la escuela o con amigos que te tenga así?"</div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <i class="fas fa-chevron-right"></i> Ideación suicida (pensamientos de muerte)
+        </div>
+        <div class="accordion-content">
+          <p><strong>Si tu hijo/a expresa deseos de morir:</strong> Mantén la calma, escucha sin juzgar. No minimices.</p>
+          <p>✔️ Pregunta directamente: "¿Has pensado en cómo lo harías? ¿Tienes acceso a algo?" (esto ayuda a evaluar riesgo).</p>
+          <p>✔️ No lo dejes solo/a. Retira objetos peligrosos si es necesario.</p>
+          <p>✔️ Busca ayuda profesional URGENTE: llama a CONASAMA 800 290-0024 o acude a urgencias de un hospital.</p>
+          <p>✔️ Acompaña a tu hijo/a a la consulta; tu presencia es clave.</p>
+          <div class="pregunta"><i class="fas fa-ambulance"></i> En caso de crisis inminente, llama al 911.</div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <i class="fas fa-chevron-right"></i> Uso problemático de redes sociales
+        </div>
+        <div class="accordion-content">
+          <p><strong>Posibles señales:</strong> Pasa muchas horas conectado, se muestra ansioso cuando no tiene el teléfono, cambios de humor tras usar redes.</p>
+          <p>✔️ Pregunta sin acusar: "¿Hay algo en redes que te esté afectando?"</p>
+          <p>✔️ Si sospechas ciberacoso, ofrece apoyo: "Puedes contarme si alguien te está molestando, buscaremos solución juntos."</p>
+          <p>✔️ Establece límites claros pero dialogados: horarios sin pantallas, espacios de conversación familiar.</p>
+          <div class="pregunta"><i class="fas fa-shield-alt"></i> "A veces en internet hay cosas que duelen. Si te pasa, quiero que lo sepas."</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA al chat con Aura (modo padres) -->
+    <div class="chat-parent-cta" onclick="openParentChat()">
+      <div class="chat-parent-cta-icon"><i class="fas fa-comments"></i></div>
+      <div class="chat-parent-cta-text">
+        <h4>Hablar con Aura (modo padres)</h4>
+        <p>Aura puede orientarte con respuestas pensadas para madres y padres. Pregúntale sin miedo.</p>
+      </div>
+      <div class="chat-parent-cta-arrow"><i class="fas fa-chevron-right"></i></div>
     </div>
 
   </div>
@@ -1633,6 +2526,9 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
     </div>
     <span class="header-badge" id="chat-badge">Contigo Siempre</span>
     <div style="display:flex;gap:8px;align-items:center;">
+      <span class="session-saved-pill" id="session-saved-pill" style="display:none;">
+        <i class="fas fa-floppy-disk"></i> Guardado
+      </span>
       <button class="btn-back" onclick="nuevaConversacion()" title="Nueva conversación" style="border-color:var(--sage);color:var(--sage);">
         <i class="fas fa-rotate-right"></i> Nueva
       </button>
@@ -1642,6 +2538,15 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
   </header>
 
   <div class="chat-wrapper">
+
+    <div id="session-restore-bar" class="session-restore-bar" style="display:none;">
+      <span><i class="fas fa-clock-rotate-left"></i> <strong id="session-restore-label">Retomando conversación anterior</strong></span>
+      <div class="session-restore-actions">
+        <button class="session-restore-btn danger" onclick="confirmarNuevaConversacion()">
+          <i class="fas fa-trash-can"></i> Borrar historial
+        </button>
+      </div>
+    </div>
 
     <div class="chat-disclaimer">
       <i class="fas fa-shield-heart"></i>
@@ -1699,7 +2604,7 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
 </div>
 
 <!-- ══════════════════════════════════════════════
-     JAVASCRIPT COMPLETO Y CORREGIDO (énfasis en acompañamiento empático)
+     JAVASCRIPT COMPLETO Y CORREGIDO (con historial de bienestar y módulo padres)
 ═══════════════════════════════════════════════ -->
 <script>
 // ── STATE ──
@@ -1710,6 +2615,124 @@ let results = [];
 let sessionNotes = [];
 let studentNotes = [];
 
+// ── BIENESTAR ─────────────────────────────────────────────
+let moodHistory = []; // array de objetos { date: 'YYYY-MM-DD', value: 1..5 }
+
+// Cargar historial desde localStorage al iniciar
+(function loadMoodHistory() {
+  const stored = localStorage.getItem('sentinelMoodHistory');
+  if (stored) {
+    try {
+      moodHistory = JSON.parse(stored);
+    } catch (e) {}
+  }
+})();
+
+function saveMoodHistory() {
+  localStorage.setItem('sentinelMoodHistory', JSON.stringify(moodHistory));
+}
+
+function selectMood(value) {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  // Actualizar o insertar nuevo registro
+  const existingIndex = moodHistory.findIndex(entry => entry.date === today);
+  if (existingIndex !== -1) {
+    moodHistory[existingIndex].value = value;
+  } else {
+    moodHistory.push({ date: today, value: value });
+  }
+  // Ordenar por fecha (más reciente primero no es necesario para la gráfica)
+  moodHistory.sort((a, b) => a.date.localeCompare(b.date));
+  saveMoodHistory();
+  updateMoodChart();
+}
+
+function updateMoodChart() {
+  const canvas = document.getElementById('moodChart');
+  const emptyMsg = document.getElementById('moodEmptyMessage');
+  if (!canvas) return;
+
+  // Si no hay datos, mostrar mensaje vacío
+  if (!moodHistory || moodHistory.length === 0) {
+    canvas.style.display = 'none';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  emptyMsg.style.display = 'none';
+
+  // Tomar últimos 7 días (o todos si hay menos)
+  const last7 = moodHistory.slice(-7);
+  const labels = last7.map(e => {
+    const [y, m, d] = e.date.split('-');
+    return `${d}/${m}`;
+  });
+  const data = last7.map(e => e.value);
+
+  // Destruir gráfica anterior si existe
+  const ctx = canvas.getContext('2d');
+  if (window.moodChartInstance) window.moodChartInstance.destroy();
+
+  // Colores según modo oscuro
+  const isDark = document.body.classList.contains('dark-mode');
+  const gridColor = isDark ? '#00d4ff22' : '#3d7a8a22';
+  const labelColor = isDark ? '#a0a0a0' : '#5a5a6e';
+
+  window.moodChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Estado de ánimo',
+        data: data,
+        borderColor: '#3d7a8a',
+        backgroundColor: 'rgba(61,122,138,0.1)',
+        tension: 0.3,
+        pointBackgroundColor: '#6b8f71',
+        pointBorderColor: '#fff',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          min: 0.5,
+          max: 5.5,
+          ticks: {
+            stepSize: 1,
+            callback: function(val) {
+              const moods = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'];
+              return moods[val] || '';
+            },
+            color: labelColor
+          },
+          grid: { color: gridColor }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: labelColor }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const val = ctx.raw;
+              const moods = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'];
+              return moods[val] || '';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 // ── DARK MODE ──
 function toggleDark() {
   document.body.classList.toggle('dark-mode');
@@ -1719,6 +2742,8 @@ function toggleDark() {
     icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
   });
   localStorage.setItem('sentinelDark', isDark ? '1' : '0');
+  // Actualizar gráfica si existe
+  if (window.moodChartInstance) updateMoodChart();
 }
 // Restore preference on load
 (function() {
@@ -1742,38 +2767,176 @@ function updateCharCount(el) {
   if (len > MAX_CHARS) el.value = el.value.slice(0, MAX_CHARS);
 }
 
+// ══════════════════════════════════════════════
+// MODO OFFLINE COMPLETO — RESPUESTAS PRE-PROGRAMADAS DE AURA
+// ══════════════════════════════════════════════
+
+// ── Biblioteca de respuestas offline por categoría ──
+const OFFLINE_RESPONSES = {
+
+  crisis: [
+    `Lo que estás sintiendo en este momento es real, y yo estoy aquí contigo aunque sea en modo limitado.\n\nNecesito que sepas que hay personas preparadas para escucharte **ahora mismo**, sin importar la hora:\n\n📞 **800 290-0024** — Línea de la Vida (CONASAMA) · Gratuita, 24 hrs\n📞 **55 5259-8121** — SAPTEL · Apoyo emocional, confidencial\n📞 **800 222-2268** — DIF Nacional · 24 hrs\n\nNo tienes que estar "suficientemente mal" para llamar. Si algo te pesa, eso es suficiente razón. ¿Puedes marcar uno de esos números?`,
+    `Detente un momento. Respira.\n\nEstás aquí, lo cual significa que una parte de ti sigue buscando salida. Eso importa muchísimo.\n\nNo estoy conectada ahora mismo, pero estas personas sí lo están y esperan tu llamada:\n\n📞 **800 290-0024** — CONASAMA · Gratuita, 24 hrs\n📞 **55 5259-8121** — SAPTEL\n\nLlamar no compromete nada. Solo escucharán. ¿Puedes intentarlo?`,
+  ],
+
+  tristeza: [
+    `Gracias por contarme lo que sientes, incluso en un momento tan difícil.\n\nLa tristeza que describes tiene sentido. No tienes que forzarte a estar bien. A veces lo más valiente es simplemente permitirte sentir lo que sientes, sin juzgarte.\n\nAlgunas cosas que pueden ayudar en este momento:\n• 🌬️ Respira lento: inhala 4 segundos, retén 4, exhala 6\n• 🌡️ Pon una mano sobre tu pecho y siente tu propio calor\n• 📝 Escribe en un papel qué es exactamente lo que más pesa hoy\n\nEstoy aquí en modo sin conexión, pero puedo seguir escuchándote. ¿Qué es lo que más duele hoy?`,
+    `Lo que sientes tiene nombre y tiene peso. La tristeza no es debilidad — es la señal de que algo que te importaba ha dolido.\n\nNo estás solo o sola en esto. Millones de personas han sentido exactamente lo que tú describes, y muchas encontraron salida. Tú también puedes.\n\nPor ahora, te propongo algo pequeño: ¿hay una sola persona, aunque sea una, con quien puedas estar hoy? No necesitas hablar de lo que sientes si no quieres. Solo no estar solo.\n\nSi necesitas apoyo profesional ahora: **800 290-0024** (CONASAMA, gratuito).`,
+    `Escucho que estás pasando por algo muy pesado. Eso requiere mucho valor para reconocerlo.\n\nCuando la tristeza es muy intensa, el cuerpo también la siente. A veces ayuda moverse aunque sea un poco: pararse, tomar agua, abrir una ventana.\n\n¿Cuándo fue la última vez que dormiste bien o comiste algo? A veces el cuerpo amplifica lo que sentimos cuando está agotado. Cuéntame más si quieres.`,
+  ],
+
+  ansiedad: [
+    `Lo que describes suena a ansiedad, y quiero que sepas que es una respuesta real de tu sistema nervioso — no exageración, no debilidad.\n\nPrueba esto conmigo ahora mismo:\n\n**Técnica 5-4-3-2-1** (ancla al presente):\n• 👀 Nombra 5 cosas que puedes VER\n• ✋ Nombra 4 cosas que puedes TOCAR\n• 👂 Nombra 3 cosas que puedes ESCUCHAR\n• 👃 Nombra 2 cosas que puedes OLER\n• 👅 Nombra 1 cosa que puedes SABOREAR\n\nEsto interrumpe el ciclo de la ansiedad trayendo tu mente al aquí y ahora. ¿Lo intentas y me dices cómo te va?`,
+    `La ansiedad miente. Le dice a tu mente que el peligro es mayor de lo que realmente es.\n\nUn ejercicio que funciona: **Respiración cuadrada**\n1. Inhala contando hasta **4**\n2. Retén el aire contando hasta **4**\n3. Exhala contando hasta **4**\n4. Espera contando hasta **4**\n\nRepite 4 veces. Esto activa tu sistema nervioso parasimpático y literalmente calma la respuesta de alarma.\n\n¿Puedes intentarlo ahora? Después cuéntame qué está detonando la ansiedad hoy.`,
+    `Entiendo. Cuando la mente empieza a correr sola, es agotador.\n\nAlgo importante: la ansiedad, por intensa que sea, siempre pasa. No es permanente aunque se sienta así.\n\nPor ahora: ¿puedes poner los pies bien plantados en el suelo, sentir su temperatura y textura? Eso parece muy simple pero ayuda a salir del espiral.\n\nEstoy en modo sin conexión, pero puedo seguir respondiendo. Cuéntame: ¿qué fue lo que detonó esto hoy?`,
+  ],
+
+  soledad: [
+    `Sentirse solo o sola, aunque haya personas alrededor, es una de las formas más difíciles de sufrimiento. Y es más común de lo que parece.\n\nNo significa que algo esté mal contigo. Significa que necesitas conexión real, y eso es una necesidad humana fundamental.\n\n¿Hay algo específico que haya pasado que intensificó esta sensación? A veces hay un momento concreto detrás de esa soledad que vale la pena explorar.\n\nEstoy aquí para escucharte.`,
+    `La soledad que describes es válida. No se trata de cuántas personas tienes cerca, sino de si te sientes realmente visto y comprendido.\n\nAlgo que puede ayudar en este momento: escríbeme. Cuéntame algo de ti que sientas que nadie conoce. A veces ponerlo en palabras — aunque sea para una IA — ayuda a procesar lo que se carga dentro.\n\nEstoy leyendo todo lo que compartes.`,
+  ],
+
+  enojo: [
+    `El enojo que describes tiene sentido. No es un sentimiento "malo" — es una señal de que algo que importa fue lastimado o ignorado.\n\nAntes de actuar desde ese enojo, puede ayudar descargarlo de forma segura:\n• Escribe lo que sientes sin filtro (nadie lo leerá)\n• Mueve el cuerpo: camina rápido, haz lagartijas, sacude los brazos\n• Respira fuerte por la nariz y exhala lento por la boca\n\nDespués, con más calma: ¿qué es lo que más duele debajo de ese enojo?`,
+  ],
+
+  autolesion: [
+    `Gracias por contarme esto. Sé que no es fácil decirlo.\n\nQuiero ser honesta contigo: esto está más allá de lo que yo puedo acompañar sola, especialmente sin conexión. Necesitas hablar con alguien capacitado ahora mismo.\n\nPor favor llama:\n📞 **800 290-0024** — CONASAMA · Gratuita, confidencial, 24 hrs\n📞 **55 5259-8121** — SAPTEL\n\nNo tienes que estar "en el límite" para llamar. Cualquier pensamiento de hacerte daño es suficiente razón. Ellos están preparados y no te juzgarán.\n\n¿Puedes llamar ahora?`,
+  ],
+
+  saludo: [
+    `Hola, estoy aquí contigo. 💙\n\nSolo quiero avisarte que en este momento estoy funcionando en **modo sin conexión** — así que mis respuestas son más limitadas que lo habitual, pero sigo aquí para escucharte.\n\n¿Cómo estás hoy? ¿Qué te trajo aquí?`,
+    `Hola. Me alegra que estés aquí.\n\nFunciono en modo sin conexión ahora mismo, lo que significa que no puedo generar respuestas tan completas como normalmente, pero sigo leyendo y respondiendo.\n\n¿Qué está pasando? Cuéntame.`,
+  ],
+
+  gratitud: [
+    `Me alegra poder acompañarte, aunque sea un poco. 💙\n\n¿Cómo te encuentras hoy? Estoy aquí para seguir escuchándote.`,
+    `Gracias por decírmelo. Significas mucho para esta conversación.\n\nSigo en modo sin conexión, pero completamente presente. ¿Hay algo más en lo que pueda ayudarte hoy?`,
+  ],
+
+  default: [
+    `Recibí tu mensaje y estoy aquí, aunque en este momento funciono sin conexión a internet.\n\nMis respuestas son más simples de lo habitual, pero sigo leyendo todo lo que compartes y puedo acompañarte.\n\nCuéntame más sobre lo que estás sintiendo. ¿Qué está pasando hoy?`,
+    `Estoy en modo sin conexión, así que no tengo acceso a mis capacidades completas, pero no me voy a ningún lado.\n\nLo que compartes importa. ¿Puedes contarme un poco más sobre cómo te encuentras?`,
+    `Modo sin conexión activo — mis respuestas serán más cortas, pero sigo aquí.\n\n¿Qué necesitas hoy? Puedo escucharte, darte técnicas de manejo emocional, o ayudarte a encontrar apoyo profesional. ¿Por dónde empezamos?`,
+  ]
+};
+
+// ── Detector de categoría por palabras clave ──
+function detectOfflineCategory(text) {
+  const t = text.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // strip accents
+
+  const patterns = [
+    { cat: 'crisis',      kw: ['suicid','quiero morir','no quiero vivir','quitarme la vida','hacerme daño','sin ganas de vivir','mejor muerto','mejor muerta','no vale la pena seguir','acabar con todo'] },
+    { cat: 'autolesion',  kw: ['cortarme','cortarse','lastimarme','lastimarme','autolesion','autolesionarme','hacerme daño'] },
+    { cat: 'ansiedad',    kw: ['ansied','ansioso','ansiosa','angustia','angustiado','angustiada','panico','ataque de panico','nerv','estres','estresado','estresada','preocupado','preocupada','no puedo respirar','corazon acelerado','taquicardia','miedo','aterrado','aterrada'] },
+    { cat: 'tristeza',    kw: ['triste','tristeza','llorando','llorar','lloro','deprim','depresion','no tengo ganas','vacío','vacía','vacio','vacia','sin energia','solo quiero dormir','cansado de todo','cansada de todo','nada tiene sentido','melanc'] },
+    { cat: 'soledad',     kw: ['solo','sola','soledad','nadie me entiende','nadie me quiere','me siento invisible','sin amigos','sin amigas','aislado','aislada','incomprendido','incomprendida'] },
+    { cat: 'enojo',       kw: ['enojado','enojada','enojo','rabia','furia','odio','odio a','quiero golpear','quiero explotar','me carga','harto','harta','hasta la madre','furioso','furiosa'] },
+    { cat: 'saludo',      kw: ['hola','buenos dias','buenas tardes','buenas noches','hey','hi ','buen dia'] },
+    { cat: 'gratitud',    kw: ['gracias','thank','muchas gracias','te lo agradezco','eres genial','me ayudaste','me ayudo'] },
+  ];
+
+  for (const { cat, kw } of patterns) {
+    if (kw.some(k => t.includes(k))) return cat;
+  }
+  return 'default';
+}
+
+// ── Pick a response, avoid immediate repeat ──
+const _offlineLastIdx = {};
+function pickOfflineResponse(cat) {
+  const pool = OFFLINE_RESPONSES[cat] || OFFLINE_RESPONSES.default;
+  if (pool.length === 1) return pool[0];
+  let idx;
+  do { idx = Math.floor(Math.random() * pool.length); }
+  while (idx === _offlineLastIdx[cat]);
+  _offlineLastIdx[cat] = idx;
+  return pool[idx];
+}
+
+// ── Offline indicator in chat header ──
+function setOfflineIndicator(offline) {
+  const banner = document.getElementById('offline-banner');
+  if (banner) banner.style.display = offline ? 'block' : 'none';
+
+  // Update chat header badge if it exists
+  let badge = document.getElementById('offline-chat-badge');
+  if (offline && !badge) {
+    const header = document.querySelector('#s-chat .app-header .header-brand');
+    if (header) {
+      badge = document.createElement('span');
+      badge.id = 'offline-chat-badge';
+      badge.innerHTML = '<i class="fas fa-wifi-slash" style="font-size:0.7rem;"></i> Sin conexión · Modo local';
+      badge.style.cssText = 'font-size:0.7rem;font-family:"DM Sans",sans-serif;font-weight:600;color:#e67e22;background:rgba(230,126,34,0.12);border:1px solid rgba(230,126,34,0.3);border-radius:20px;padding:3px 10px;margin-left:8px;white-space:nowrap;';
+      header.appendChild(badge);
+    }
+  } else if (!offline && badge) {
+    badge.remove();
+  }
+
+  // Disable internet-only features, but KEEP chat enabled
+  const micBtn     = document.getElementById('mic-btn');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const iaRunBtn   = document.getElementById('iaRunBtn');
+  if (micBtn)     micBtn.disabled = offline;
+  if (analyzeBtn) analyzeBtn.disabled = offline;
+  if (iaRunBtn)   iaRunBtn.disabled = offline;
+
+  // Chat send button stays ENABLED offline (uses local responses)
+  const sendBtn = document.getElementById('chat-send-btn');
+  if (sendBtn) sendBtn.disabled = false;
+}
+
+function updateOnlineStatus() {
+  setOfflineIndicator(!navigator.onLine);
+}
+
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+
+// Override sendMessage: route to offline engine when disconnected
+const originalSendMessage = sendMessage;
+sendMessage = function() {
+  if (!navigator.onLine) {
+    // Run the offline pipeline instead of Groq
+    offlineSendMessage();
+    return;
+  }
+  originalSendMessage();
+};
+
+function offlineSendMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  chatHistory.push({ role: 'user', text });
+  appendMessage('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('chat-send-btn').disabled = true;
+
+  appendTyping();
+  const delay = 900 + Math.random() * 800;
+
+  setTimeout(function() {
+    removeTyping();
+    const cat      = detectOfflineCategory(text);
+    const response = pickOfflineResponse(cat);
+    chatHistory.push({ role: 'ai', text: response });
+    if (chatHistory.length > CHAT_MAX_MESSAGES) chatHistory = chatHistory.slice(-CHAT_MAX_MESSAGES);
+    appendMessage('ai', response);
+    speakText(response);
+    document.getElementById('chat-send-btn').disabled = false;
+  }, delay);
+}
+
 // ── NAVIGATION ──
 function enterApp(profile) {
   currentProfile = profile;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-
-  // Configure professional tabs based on profile
-  if (profile === 'salud') {
-    document.getElementById('tab-eval').style.display = '';
-    document.getElementById('tab-notes').style.display = '';
-    document.getElementById('tab-classroom').style.display = 'none';
-    document.getElementById('tab-parent').style.display = 'none';
-    document.getElementById('protocol-salud').style.display = 'block';
-    document.getElementById('protocol-maestro').style.display = 'none';
-    document.getElementById('resources-salud').style.display = 'block';
-    document.getElementById('resources-maestro').style.display = 'none';
-    document.getElementById('pro-main-title').innerHTML = '<i class="fas fa-stethoscope"></i> Panel Clínico — Riesgo Suicida';
-    initColumbiaChecklist();
-    initRiskFactors();
-  } else if (profile === 'maestro') {
-    document.getElementById('tab-eval').style.display = 'none';
-    document.getElementById('tab-notes').style.display = 'none';
-    document.getElementById('tab-classroom').style.display = '';
-    document.getElementById('tab-parent').style.display = '';
-    document.getElementById('protocol-salud').style.display = 'none';
-    document.getElementById('protocol-maestro').style.display = 'block';
-    document.getElementById('resources-salud').style.display = 'none';
-    document.getElementById('resources-maestro').style.display = 'block';
-    document.getElementById('pro-main-title').innerHTML = '<i class="fas fa-chalkboard-teacher"></i> Panel Educativo — Detección y Actuación';
-    initClassroomChecklist();
-  }
-  // Reset to first tab
-  switchProTab('analisys');
 
   if (profile === 'joven' || profile === 'adulto') {
     document.getElementById('s-personal').classList.add('active');
@@ -1786,18 +2949,49 @@ function enterApp(profile) {
       badge.textContent = 'Adulto';
       greeting.textContent = 'Hola — estamos aquí contigo';
     }
+    // Actualizar gráfica de bienestar al entrar
+    setTimeout(updateMoodChart, 100);
     window.scrollTo(0, 0);
-  } else {
+  }
+  else if (profile === 'padre') {
+    document.getElementById('s-padres').classList.add('active');
+    window.scrollTo(0, 0);
+  }
+  else { // profesional (salud / maestro)
     document.getElementById('s-professional').classList.add('active');
     const badge = document.getElementById('pro-badge');
     const roleDesc = document.getElementById('pro-role-desc');
     if (profile === 'salud') {
       badge.textContent = 'Profesional de Salud';
       roleDesc.textContent = 'profesionales de la salud';
-    } else {
+      // Mostrar tabs de salud
+      document.getElementById('tab-eval').style.display = '';
+      document.getElementById('tab-notes').style.display = '';
+      document.getElementById('tab-classroom').style.display = 'none';
+      document.getElementById('tab-parent').style.display = 'none';
+      document.getElementById('protocol-salud').style.display = 'block';
+      document.getElementById('protocol-maestro').style.display = 'none';
+      document.getElementById('resources-salud').style.display = 'block';
+      document.getElementById('resources-maestro').style.display = 'none';
+      document.getElementById('pro-main-title').innerHTML = '<i class="fas fa-stethoscope"></i> Panel Clínico — Riesgo Suicida';
+      initColumbiaChecklist();
+      initRiskFactors();
+    } else if (profile === 'maestro') {
       badge.textContent = 'Maestro / Educador';
       roleDesc.textContent = 'educadores y docentes';
+      document.getElementById('tab-eval').style.display = 'none';
+      document.getElementById('tab-notes').style.display = 'none';
+      document.getElementById('tab-classroom').style.display = '';
+      document.getElementById('tab-parent').style.display = '';
+      document.getElementById('protocol-salud').style.display = 'none';
+      document.getElementById('protocol-maestro').style.display = 'block';
+      document.getElementById('resources-salud').style.display = 'none';
+      document.getElementById('resources-maestro').style.display = 'block';
+      document.getElementById('pro-main-title').innerHTML = '<i class="fas fa-chalkboard-teacher"></i> Panel Educativo — Detección y Actuación';
+      initClassroomChecklist();
     }
+    // Reset to first tab
+    switchProTab('analisys');
     window.scrollTo(0, 0);
   }
 }
@@ -1806,6 +3000,20 @@ function goBack() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('s-landing').classList.add('active');
   window.scrollTo(0, 0);
+}
+
+// ── ACORDEÓN PARA PADRES ─────────────────────
+function toggleAccordion(header) {
+  header.classList.toggle('active');
+  const content = header.nextElementSibling;
+  content.classList.toggle('active');
+}
+
+// ── CHAT PARA PADRES ─────────────────────────
+function openParentChat() {
+  // Configurar el chat en modo padres (se puede detectar en openChat)
+  currentProfile = 'padre'; // para que el chat sepa que es modo padres
+  openChat(); // reutiliza la función existente
 }
 
 // ══════════════════════════════════════════════
@@ -2649,7 +3857,7 @@ function showNoWordCloud() {
 }
 
 // ══════════════════════════════════════════════
-// CHAT CON GROQ - PROMPT CÁLIDO Y EMPÁTICO (sin presión)
+// CHAT CON GROQ - PROMPT CÁLIDO Y EMPÁTICO (con versión para padres)
 // ══════════════════════════════════════════════
 const GROQ_KEY = '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';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -2678,20 +3886,168 @@ Ejemplo de tono adecuado:
 - "Gracias por compartir eso conmigo. Debe ser muy pesado llevar todo eso. Estoy aquí para lo que necesites."
 - "Parece que estás pasando por un momento complicado. ¿Quieres contarme más sobre cómo te sientes?"`;
 
+// Cuando se detecte que el perfil es 'padre', se puede añadir un prefijo al prompt o cambiar el system prompt
+// Pero lo dejamos igual, ya que el chatbot es adaptable. La función openParentChat ya establece currentProfile='padre'.
+
 let chatHistory = [];
 let pendingFiles = [];
+
+// ══════════════════════════════════════════════
+// PERSISTENCIA DE SESIÓN DE CHAT — localStorage
+// ══════════════════════════════════════════════
+const CHAT_STORAGE_KEY  = 'sentinelChatSession';
+const CHAT_MAX_DAYS     = 7;   // auto-expire after 7 days of inactivity
+const CHAT_MAX_MESSAGES = 30;  // cap stored messages
+
+function saveChatSession() {
+  if (!chatHistory.length) return;
+  try {
+    const payload = {
+      profile:  currentProfile || 'joven',
+      savedAt:  new Date().toISOString(),
+      history:  chatHistory.slice(-CHAT_MAX_MESSAGES)
+    };
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(payload));
+    flashSavedPill();
+  } catch (e) { /* quota exceeded — silently skip */ }
+}
+
+function loadChatSession() {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Auto-expire
+    const savedAt = new Date(data.savedAt);
+    const ageMs   = Date.now() - savedAt.getTime();
+    if (ageMs > CHAT_MAX_DAYS * 24 * 3600 * 1000) {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+      return null;
+    }
+    return data;
+  } catch (e) { return null; }
+}
+
+function clearChatSession() {
+  localStorage.removeItem(CHAT_STORAGE_KEY);
+}
+
+function flashSavedPill() {
+  const pill = document.getElementById('session-saved-pill');
+  if (!pill) return;
+  pill.style.display = 'inline-flex';
+  pill.classList.remove('flash');
+  void pill.offsetWidth; // force reflow
+  pill.classList.add('flash');
+  // Hide again after 3s of inactivity
+  clearTimeout(pill._hideTimer);
+  pill._hideTimer = setTimeout(() => {
+    pill.style.display = 'none';
+    pill.classList.remove('flash');
+  }, 3000);
+}
+
+// ── formatRelativeDate: "Hoy", "Ayer", "hace 3 días", "dd/mm/yyyy" ──
+function formatRelativeDate(isoString) {
+  const d = new Date(isoString);
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  if (d.toDateString() === todayStr) return 'Hoy';
+  if (d.toDateString() === yest.toDateString()) return 'Ayer';
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays < 7) return 'Hace ' + diffDays + ' días';
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function insertDateSeparator(label) {
+  const container = document.getElementById('chat-messages');
+  const sep = document.createElement('div');
+  sep.className = 'chat-date-sep';
+  sep.textContent = label;
+  container.appendChild(sep);
+}
 
 function openChat() {
   currentProfile = currentProfile || 'joven';
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('s-chat').classList.add('active');
-  document.getElementById('chat-badge').textContent = currentProfile === 'joven' ? 'Joven' : 'Adulto';
+
+  if (currentProfile === 'padre') {
+    document.getElementById('chat-badge').textContent = 'Guía para padres';
+  } else {
+    document.getElementById('chat-badge').textContent = currentProfile === 'joven' ? 'Joven' : 'Adulto';
+  }
   window.scrollTo(0, 0);
-  if (chatHistory.length === 0) initChat();
+
+  // Only load/init if messages area is empty (avoid duplication on re-open)
+  const container = document.getElementById('chat-messages');
+  if (container.children.length > 0) return;
+
+  const saved = loadChatSession();
+
+  if (saved && saved.history && saved.history.length > 0) {
+    // ── Restore previous session ──
+    chatHistory = saved.history;
+
+    // Show restore banner
+    const bar   = document.getElementById('session-restore-bar');
+    const label = document.getElementById('session-restore-label');
+    if (bar && label) {
+      const when = formatRelativeDate(saved.savedAt);
+      const time = new Date(saved.savedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+      label.textContent = when === 'Hoy'
+        ? 'Retomando conversación de hoy · ' + time
+        : 'Retomando conversación del ' + when.toLowerCase();
+      bar.style.display = 'flex';
+    }
+
+    // Render old messages silently (no TTS, no save)
+    insertDateSeparator(formatRelativeDate(saved.savedAt));
+    saved.history.forEach(function(m) {
+      appendMessageSilent(m.role, m.text, m.time || null);
+    });
+
+    // Insert "today" separator before new messages will appear
+    const todayLabel = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+    insertDateSeparator('Ahora · ' + todayLabel);
+
+  } else {
+    // ── Fresh session ──
+    initChat();
+  }
+}
+
+function confirmarNuevaConversacion() {
+  if (!confirm('¿Borrar el historial guardado e iniciar una conversación nueva?')) return;
+  limpiarYReiniciar();
+}
+
+function nuevaConversacion() {
+  if (chatHistory.length > 1) {
+    if (!confirm('¿Iniciar una nueva conversación? El historial guardado se borrará.')) return;
+  }
+  limpiarYReiniciar();
+}
+
+function limpiarYReiniciar() {
+  stopTTS();
+  clearChatSession();
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+  chatHistory  = [];
+  pendingFiles = [];
+  renderFilePreviews();
+  // Hide UI elements
+  const bar  = document.getElementById('session-restore-bar');
+  const pill = document.getElementById('session-saved-pill');
+  if (bar)  bar.style.display  = 'none';
+  if (pill) pill.style.display = 'none';
+  initChat();
 }
 
 function goBackFromChat() {
-  stopTTS(); // stop any ongoing speech before showing modal
+  stopTTS();
   const modal = document.getElementById('exit-modal');
   modal.style.display = 'flex';
 }
@@ -2703,25 +4059,24 @@ function closeExitModal() {
 function confirmExit() {
   document.getElementById('exit-modal').style.display = 'none';
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('s-personal').classList.add('active');
+  if (currentProfile === 'padre') {
+    document.getElementById('s-padres').classList.add('active');
+  } else {
+    document.getElementById('s-personal').classList.add('active');
+  }
   window.scrollTo(0, 0);
-}
-
-function nuevaConversacion() {
-  if (!confirm('¿Iniciar una nueva conversación? El historial actual se borrará.')) return;
-  stopTTS();
-  document.getElementById('chat-messages').innerHTML = '';
-  chatHistory = [];
-  pendingFiles = [];
-  renderFilePreviews();
-  initChat();
 }
 
 function initChat() {
   chatHistory = [];
-  const greeting = currentProfile === 'joven'
-    ? 'Hola 👋 Soy Aura, tu asistente de apoyo. Estoy aquí para escucharte sin juzgarte. ¿Cómo estás hoy? Puedes contarme lo que quieras, o compartir una imagen si lo prefieres.'
-    : 'Hola 👋 Soy Aura. Este es un espacio seguro para ti. ¿Cómo te has sentido últimamente? Cuéntame lo que traigas — aquí no hay respuestas incorrectas.';
+  let greeting = '';
+  if (currentProfile === 'padre') {
+    greeting = 'Hola 👋 Soy Aura. Entiendo lo difícil que puede ser ver a un hijo/a pasar por un mal momento. Estoy aquí para orientarte con información y sugerencias desde la perspectiva de padres. Cuéntame, ¿qué está sucediendo o qué te preocupa?';
+  } else if (currentProfile === 'joven') {
+    greeting = 'Hola 👋 Soy Aura, tu asistente de apoyo. Estoy aquí para escucharte sin juzgarte. ¿Cómo estás hoy? Puedes contarme lo que quieras, o compartir una imagen si lo prefieres.';
+  } else {
+    greeting = 'Hola 👋 Soy Aura. Este es un espacio seguro para ti. ¿Cómo te has sentido últimamente? Cuéntame lo que traigas — aquí no hay respuestas incorrectas.';
+  }
   appendMessage('ai', greeting);
 }
 
@@ -2732,6 +4087,25 @@ const CRISIS_WORDS = [
   'sin ganas de vivir','no quiero existir','dormir para siempre'
 ];
 
+// ── appendMessageSilent: restore stored messages without side-effects ──
+function appendMessageSilent(role, text, savedTime) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+
+  const avatarIcon   = role === 'ai' ? 'fas fa-heart' : 'fas fa-user';
+  const formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  const timeStr = savedTime || '';
+
+  // Mute crisis inline banners on restoration (already acted on in the past)
+  div.innerHTML = '<div class="msg-avatar"><i class="' + avatarIcon + '"></i></div>'
+    + '<div class="msg-bubble" style="opacity:0.88;">' + formattedText
+    + (timeStr ? '<span class="msg-time">' + timeStr + '</span>' : '')
+    + '</div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
 function appendMessage(role, text, fileInfo) {
   const container = document.getElementById('chat-messages');
   const div = document.createElement('div');
@@ -2739,7 +4113,7 @@ function appendMessage(role, text, fileInfo) {
 
   const avatarIcon = role === 'ai' ? 'fas fa-heart' : 'fas fa-user';
 
-  // Detección de crisis — siempre activa, en mensajes del usuario Y de Aura
+  // Detección de crisis
   const lowerText = text.toLowerCase();
   const hasRisk = CRISIS_WORDS.some(w => lowerText.includes(w));
   const crisisHtml = hasRisk
@@ -2771,6 +4145,17 @@ function appendMessage(role, text, fileInfo) {
 
   // Speak AI responses if TTS is enabled
   if (role === 'ai') speakText(text);
+
+  // ── Persist to localStorage (skip file attachments — too heavy) ──
+  if (role === 'user' || role === 'ai') {
+    // Update chatHistory entry with timestamp for storage
+    // (history is pushed before appendMessage for user, after for ai — we annotate the last entry)
+    const lastEntry = chatHistory[chatHistory.length - 1];
+    if (lastEntry && lastEntry.role === role && !lastEntry.time) {
+      lastEntry.time = timeStr;
+    }
+    saveChatSession();
+  }
 }
 
 function appendTyping() {
@@ -3008,12 +4393,46 @@ function speakText(text) {
 
 if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = () => {};
 
+// ── Crisis Mode (Panic Button) ─────────────────
+function openCrisisMode() {
+  const overlay = document.getElementById('crisis-overlay');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  // Stop any TTS if active
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  // Trap focus inside overlay
+  overlay.focus && overlay.focus();
+}
+
+function closeCrisisMode() {
+  const overlay = document.getElementById('crisis-overlay');
+  overlay.style.animation = 'none';
+  overlay.style.opacity = '0';
+  overlay.style.transform = 'scale(0.97)';
+  overlay.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    overlay.style.cssText = '';
+    document.body.style.overflow = '';
+  }, 250);
+}
+
+// Close with Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('crisis-overlay').classList.contains('active')) {
+    closeCrisisMode();
+  }
+});
+
 async function sendMessage() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   const files = [...pendingFiles];
 
   if (!text && !files.length) return;
+
+  // ── Push to history FIRST so appendMessage can annotate the timestamp ──
+  chatHistory.push({ role: 'user', text: text || '[archivo adjunto]' });
 
   const fileInfoDisplay = files.length
     ? (files[0].type === 'image' ? { type: 'image', data: files[0].data, name: files[0].name } : { type: 'file', name: files[0].name })
@@ -3040,9 +4459,8 @@ async function sendMessage() {
       userContent += '\n[El usuario compartió una imagen: ' + f.name + '. Responde con empatía considerando que puede ser relevante para lo que siente.]';
     }
   });
-  groqMessages.push({ role: 'user', content: userContent });
-
-  chatHistory.push({ role: 'user', text: text || '[archivo adjunto]' });
+  // Replace the last user entry with enriched content for Groq (don't store file data in history)
+  groqMessages[groqMessages.length - 1] = { role: 'user', content: userContent };
 
   appendTyping();
 
@@ -3051,21 +4469,96 @@ async function sendMessage() {
     removeTyping();
 
     if (result.ok) {
-      appendMessage('ai', result.text);
       chatHistory.push({ role: 'ai', text: result.text });
-      if (chatHistory.length > 30) chatHistory = chatHistory.slice(-30);
+      if (chatHistory.length > CHAT_MAX_MESSAGES) chatHistory = chatHistory.slice(-CHAT_MAX_MESSAGES);
+      appendMessage('ai', result.text);
     } else {
-      appendMessage('ai', 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.');
+      const fallback = 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.';
+      chatHistory.push({ role: 'ai', text: fallback });
+      appendMessage('ai', fallback);
     }
   } catch (err) {
     removeTyping();
-    appendMessage('ai', 'Ups, algo salió mal. Pero quiero que sepas que me importa lo que compartes. Si es urgente, los números de ayuda están siempre disponibles: **800 290-0024** (CONASAMA) o **800 222-2268** (DIF).');
+    const fallback = 'Ups, algo salió mal. Pero quiero que sepas que me importa lo que compartes. Si es urgente, los números de ayuda están siempre disponibles: **800 290-0024** (CONASAMA) o **800 222-2268** (DIF).';
+    chatHistory.push({ role: 'ai', text: fallback });
+    appendMessage('ai', fallback);
     console.error('Chat error:', err);
   }
 
   document.getElementById('chat-send-btn').disabled = false;
 }
 </script>
+
+<!-- ══════════════════════════════════════════════
+     BOTÓN DE PÁNICO — VISIBLE EN TODAS LAS PANTALLAS
+═══════════════════════════════════════════════ -->
+<button id="panic-btn" onclick="openCrisisMode()" aria-label="Modo de crisis inmediata">
+  <span class="panic-icon"><i class="fas fa-phone-volume"></i></span>
+  Necesito ayuda ahora
+</button>
+
+<!-- ══════════════════════════════════════════════
+     CRISIS OVERLAY — PANTALLA COMPLETA
+═══════════════════════════════════════════════ -->
+<div id="crisis-overlay" role="dialog" aria-modal="true" aria-label="Líneas de crisis inmediata">
+  <div class="crisis-overlay-inner">
+
+    <div class="crisis-aura">🤍</div>
+
+    <h1 class="crisis-headline">Estás a salvo.<br>Hay ayuda ahora mismo.</h1>
+    <p class="crisis-subline">No tienes que pasar por esto solo o sola.</p>
+
+    <div class="crisis-aura-msg">
+      <p>
+        Lo que sientes en este momento es real y válido. No tienes que resolverlo todo ahora.
+        Solo da un paso: marca uno de estos números. Hay una persona esperando escucharte,
+        sin juzgarte, disponible ahora mismo. Puedes hacerlo. 💙
+      </p>
+    </div>
+
+    <div class="crisis-phones">
+
+      <a href="tel:8002900024" class="crisis-call-card">
+        <div class="crisis-call-icon red"><i class="fas fa-phone-flip"></i></div>
+        <div class="crisis-call-info">
+          <div class="crisis-call-name">Línea de la Vida — CONASAMA</div>
+          <div class="crisis-call-number red">800 290-0024</div>
+          <div class="crisis-call-desc">Crisis emocional y suicidio · Gratuita · 24 horas</div>
+        </div>
+        <span class="crisis-call-btn"><i class="fas fa-phone"></i> Llamar</span>
+      </a>
+
+      <a href="tel:5552598121" class="crisis-call-card">
+        <div class="crisis-call-icon teal"><i class="fas fa-headset"></i></div>
+        <div class="crisis-call-info">
+          <div class="crisis-call-name">SAPTEL</div>
+          <div class="crisis-call-number teal">55 5259-8121</div>
+          <div class="crisis-call-desc">Apoyo emocional · Confidencial · 24 horas</div>
+        </div>
+        <span class="crisis-call-btn teal-btn"><i class="fas fa-phone"></i> Llamar</span>
+      </a>
+
+      <a href="tel:8002222268" class="crisis-call-card">
+        <div class="crisis-call-icon green"><i class="fas fa-shield-heart"></i></div>
+        <div class="crisis-call-info">
+          <div class="crisis-call-name">DIF Nacional</div>
+          <div class="crisis-call-number green">800 222-2268</div>
+          <div class="crisis-call-desc">Violencia familiar y apoyo · Gratuita · 24 horas</div>
+        </div>
+        <span class="crisis-call-btn green-btn"><i class="fas fa-phone"></i> Llamar</span>
+      </a>
+
+    </div>
+
+    <div class="crisis-close-row">
+      <button class="crisis-close-btn" onclick="closeCrisisMode()">
+        <i class="fas fa-arrow-left" style="font-size:0.75rem;margin-right:6px;"></i>
+        Volver a la aplicación
+      </button>
+    </div>
+
+  </div>
+</div>
 
 <!-- ── MODAL RECURSOS AL SALIR DEL CHAT ── -->
 <div id="exit-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); align-items:center; justify-content:center;">
