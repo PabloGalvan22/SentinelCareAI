@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SentinelCareAI — Contigo Siempre</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3d7a8a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SentinelCare">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Apoyo emocional y detección de riesgo con inteligencia artificial. Contigo siempre.">/
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -5159,6 +5168,92 @@ async function sendMessage() {
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════
+     PWA — SERVICE WORKER REGISTRATION
+═══════════════════════════════════════════════ -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/SentinelCareAI/sw.js')
+      .then(reg => {
+        console.log('SW registrado:', reg.scope);
+
+        // Mostrar banner de "instalar app" cuando el navegador lo permita
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', e => {
+          e.preventDefault();
+          deferredPrompt = e;
+          showInstallBanner();
+        });
+
+        window.addEventListener('appinstalled', () => {
+          hideInstallBanner();
+          deferredPrompt = null;
+        });
+
+        window.installApp = async () => {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') hideInstallBanner();
+          deferredPrompt = null;
+        };
+      })
+      .catch(err => console.warn('SW no registrado:', err));
+  });
+}
+
+function showInstallBanner() {
+  if (document.getElementById('pwa-install-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'pwa-install-banner';
+  banner.innerHTML = `
+    <div style="
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: var(--card-bg); border: 1.5px solid var(--border);
+      border-radius: 18px; padding: 14px 20px; box-shadow: var(--shadow-hover);
+      display: flex; align-items: center; gap: 14px; z-index: 9000;
+      max-width: 340px; width: 90%; backdrop-filter: blur(16px);
+      animation: fadeIn 0.4s ease;
+    ">
+      <div style="
+        width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+        background: linear-gradient(135deg, var(--sage), var(--teal));
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; color: white;
+      ">💚</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark); margin-bottom: 2px;">
+          Instalar SentinelCare
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-mid); line-height: 1.4;">
+          Accede más rápido desde tu pantalla de inicio
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+        <button onclick="installApp()" style="
+          background: linear-gradient(135deg, var(--sage), var(--teal));
+          border: none; border-radius: 10px; padding: 7px 14px;
+          color: white; font-size: 0.8rem; font-weight: 600;
+          cursor: pointer; font-family: 'DM Sans', sans-serif;
+        ">Instalar</button>
+        <button onclick="hideInstallBanner()" style="
+          background: none; border: 1px solid var(--border);
+          border-radius: 10px; padding: 5px 14px; color: var(--text-light);
+          font-size: 0.75rem; cursor: pointer; font-family: 'DM Sans', sans-serif;
+        ">Ahora no</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(banner);
+}
+
+function hideInstallBanner() {
+  const b = document.getElementById('pwa-install-banner');
+  if (b) b.remove();
+}
+</script>
 
 </body>
 </html>
