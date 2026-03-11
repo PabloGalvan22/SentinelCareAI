@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SentinelCareAI — Contigo Siempre</title>
-
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#3d7a8a">
@@ -12,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SentinelCare">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="description" content="Apoyo emocional y detección de riesgo con inteligencia artificial. Contigo siempre.">/
+<meta name="description" content="Apoyo emocional y detección de riesgo con inteligencia artificial. Contigo siempre.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -1386,20 +1385,6 @@ body.dark-mode #panic-btn { box-shadow: 0 8px 32px rgba(192,57,43,0.65), 0 0 0 0
 .quote-card cite { font-size:0.8rem; color:var(--text-light); font-style:normal; }
 
 /* ─── RESPONSIVE ──────────────────────────────── */
-@media(max-width:640px){
-  .profile-grid { grid-template-columns:1fr; }
-  .landing-card { padding: 36px 24px; }
-  .why-grid, .resources-grid { grid-template-columns:1fr; }
-  .pro-charts { grid-template-columns:1fr; }
-  .guidance-grid { grid-template-columns:1fr; }
-  .app-header { padding:0 16px; }
-  .pro-container { padding: 20px 16px; }
-  .mood-selector { flex-direction: column; align-items: stretch; }
-  .alert-grid { grid-template-columns: 1fr; }
-  .guias-grid { grid-template-columns: 1fr; }
-  .do-dont { grid-template-columns: 1fr; }
-}
-
 /* ─── PANTALLA DE ACCESO PROFESIONAL ─────────── */
 #s-pro-access {
   align-items: center;
@@ -1941,10 +1926,23 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
   .msg-bubble { font-size: 0.9rem; padding: 11px 14px; border-radius: 18px; }
   .msg-avatar { width: 28px; height: 28px; font-size: 0.75rem; }
 
-  /* Panel profesional */
+  /* Panel profesional — tabs con scroll horizontal */
   .pro-container { padding: 14px 12px; }
-  .pro-tab-bar { gap: 4px; }
-  .pro-tab-btn { padding: 8px 12px; font-size: 0.78rem; }
+  .pro-tab-bar {
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
+  }
+  .pro-tab-bar::-webkit-scrollbar { display: none; }
+  .pro-tab-btn { padding: 8px 12px; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; }
+  .pro-charts { grid-template-columns: 1fr; }
+  .pro-form-row { grid-template-columns: 1fr; }
+  .two-col-grid { grid-template-columns: 1fr !important; }
+  .score-bar { flex-direction: column; gap: 10px; align-items: flex-start; }
+  .checklist-card { padding: 18px 14px; }
 
   /* Pantalla personal / padres */
   .personal-container, .padres-container { padding: 16px 14px; }
@@ -1952,7 +1950,34 @@ body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(
 
   /* Acceso profesional */
   .pro-access-card { padding: 36px 24px 32px; border-radius: 22px; }
+
+  /* Mood */
+  .mood-selector { gap: 6px; }
+  .mood-btn { padding: 10px 8px; }
 }
+
+/* ─── MÓVIL PEQUEÑO — 400px (iPhone SE, Galaxy A) ── */
+@media(max-width:400px){
+
+  /* Landing: 1 columna */
+  .profile-grid { grid-template-columns: 1fr !important; }
+  .landing-title { font-size: 1.75rem; }
+  .landing-card { padding: 24px 14px 28px; }
+
+  /* Header compacto */
+  .app-header { padding: 0 10px; }
+
+  /* Chat */
+  .msg-bubble { max-width: 94%; font-size: 0.85rem; padding: 10px 12px; }
+
+  /* Tabs del panel pro aún más pequeños */
+  .pro-tab-btn { padding: 7px 10px; font-size: 0.74rem; }
+  .pro-container { padding: 10px; }
+
+  /* Botones */
+  .btn-primary { padding: 13px 20px; font-size: 0.95rem; }
+}
+
 
 /* Prevenir zoom en inputs iOS sin romper tamaño visual */
 @media(max-width:640px){
@@ -2615,7 +2640,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       </div>
       <div class="checklist-card" style="margin-top:16px;">
         <h4><i class="fas fa-shield-virus"></i> Factores de riesgo y protectores</h4>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div>
             <p style="font-size:0.8rem;color:#ff6b5b;margin-bottom:8px;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> Factores de RIESGO presentes</p>
             <div id="risk-factors-list"></div>
@@ -2741,7 +2766,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       </div>
       <div class="checklist-card" style="margin-top:16px;">
         <h4><i class="fas fa-triangle-exclamation"></i> Qué NO decir a la familia</h4>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div style="background:rgba(255,68,68,0.07);border:1px solid rgba(255,68,68,0.2);border-radius:10px;padding:14px;">
             <p style="color:#ff6b5b;font-size:0.82rem;font-weight:600;margin-bottom:6px;"><i class="fas fa-ban"></i> Evitar</p>
             <ul style="font-size:0.82rem;color:#909090;line-height:1.8;padding-left:16px;margin:0;"><li>"Su hijo es suicida"</li><li>"Esto pasó por su culpa"</li><li>"No es para tanto"</li><li>"En mi tiempo no había esto"</li><li>"Seguro es por el celular"</li></ul>
@@ -5158,99 +5183,161 @@ async function sendMessage() {
         </div>
       </a>
     </div>
-    <div style="display:flex;gap:10px;justify-content:center;">
-      <button onclick="closeExitModal()" style="flex:1;background:none;border:1.5px solid var(--border);border-radius:12px;padding:11px 20px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--text-mid);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border)'">
-        Volver al chat
+    <div style="display:flex;gap:10px;justify-content:center;flex-direction:column;">
+      <button onclick="exportChatPDF()" style="width:100%;background:rgba(61,122,138,0.08);border:1.5px solid rgba(61,122,138,0.3);border-radius:12px;padding:11px 20px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--teal);font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;" onmouseover="this.style.background='rgba(61,122,138,0.15)'" onmouseout="this.style.background='rgba(61,122,138,0.08)'">
+        <i class="fas fa-file-pdf"></i> Guardar resumen de la conversación
       </button>
-      <button onclick="confirmExit()" style="flex:1;background:linear-gradient(135deg,var(--sage),var(--teal));border:none;border-radius:12px;padding:11px 20px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:white;font-weight:600;">
-        Salir
-      </button>
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeExitModal()" style="flex:1;background:none;border:1.5px solid var(--border);border-radius:12px;padding:11px 20px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--text-mid);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border)'">
+          Volver al chat
+        </button>
+        <button onclick="confirmExit()" style="flex:1;background:linear-gradient(135deg,var(--sage),var(--teal));border:none;border-radius:12px;padding:11px 20px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:white;font-weight:600;">
+          Salir
+        </button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--text-light);margin:0;line-height:1.5;text-align:center;">El PDF no incluye datos personales y es solo para uso de referencia.</p>
     </div>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════════
-     PWA — SERVICE WORKER REGISTRATION
-═══════════════════════════════════════════════ -->
+     EXPORTAR CHAT EN PDF
+══════════════════════════════════════════════ -->
+<script>
+function exportChatPDF() {
+  if (!chatHistory || chatHistory.length === 0) {
+    alert('No hay mensajes en la conversación para exportar.');
+    return;
+  }
+  const profileLabels = { joven: 'Joven', adulto: 'Adulto', padre: 'Guía para padres' };
+  const profileLabel  = profileLabels[currentProfile] || 'Usuario';
+  const fecha = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const hora  = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', hour12: true });
+
+  const rows = chatHistory.map(m => {
+    const isUser = m.role === 'user';
+    const quien  = isUser ? '🧑 Tú' : '💚 Aura';
+    const time   = m.time ? `<span class="pdf-time">${m.time}</span>` : '';
+    const texto  = (m.text || m.content || '')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+    return `<div class="pdf-msg ${isUser ? 'pdf-user' : 'pdf-ai'}">
+      <div class="pdf-who">${quien} ${time}</div>
+      <div class="pdf-text">${texto}</div>
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Resumen — SentinelCareAI</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Georgia, serif; font-size: 12pt; color: #1a1a1a; padding: 32px 40px; max-width: 700px; margin: 0 auto; }
+.pdf-header { border-bottom: 2px solid #3d7a8a; padding-bottom: 18px; margin-bottom: 24px; }
+.pdf-logo { font-size: 18pt; font-weight: 700; color: #3d7a8a; }
+.pdf-logo span { color: #6b8f71; }
+.pdf-meta { font-size: 9.5pt; color: #666; margin-top: 6px; line-height: 1.7; }
+.pdf-disclaimer { background: #f0f7f4; border-left: 3px solid #6b8f71; padding: 10px 14px; font-size: 9pt; color: #444; margin-bottom: 24px; line-height: 1.6; border-radius: 0 6px 6px 0; }
+.pdf-msg { margin-bottom: 14px; padding: 12px 16px; border-radius: 10px; page-break-inside: avoid; }
+.pdf-user { background: #f0f4ff; border: 1px solid #d0d8f0; }
+.pdf-ai   { background: #f0f7f4; border: 1px solid #c8ddd0; }
+.pdf-who  { font-size: 8.5pt; font-weight: 700; color: #555; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.pdf-time { font-weight: 400; color: #999; text-transform: none; letter-spacing: 0; }
+.pdf-text { font-size: 11pt; line-height: 1.7; }
+.pdf-crisis { background: #fff5f5; border: 1px solid #f5c0bb; border-radius: 8px; padding: 14px 18px; margin-top: 24px; }
+.pdf-crisis-title { font-weight: 700; color: #c0392b; font-size: 10pt; margin-bottom: 8px; }
+.pdf-crisis li { font-size: 10pt; line-height: 2; padding-left: 18px; }
+.pdf-footer { border-top: 1px solid #ddd; margin-top: 24px; padding-top: 12px; font-size: 8.5pt; color: #888; text-align: center; line-height: 1.8; }
+@media print { body { padding: 0; } @page { margin: 2cm; size: A4; } }
+<\/style><\/head><body>
+<div class="pdf-header">
+  <div class="pdf-logo">Sentinel<span>Care</span>AI</div>
+  <div class="pdf-meta">Resumen de conversación · Perfil: ${profileLabel}<br>Generado el ${fecha} a las ${hora}</div>
+</div>
+<div class="pdf-disclaimer"><strong>Nota de privacidad:</strong> Este resumen fue generado localmente en tu dispositivo. Ningún tercero recibe ni almacena este documento. Puedes compartirlo con tu terapeuta o persona de confianza.</div>
+${rows}
+<div class="pdf-crisis">
+  <div class="pdf-crisis-title">📞 Líneas de apoyo — 24 hrs, sin costo</div>
+  <ul>
+    <li><strong>CONASAMA Línea de la Vida:</strong> 800 290-0024</li>
+    <li><strong>SAPTEL:</strong> 55 5259-8121</li>
+    <li><strong>DIF Nacional:</strong> 800 222-2268</li>
+    <li><strong>Emergencias:</strong> 911</li>
+  </ul>
+</div>
+<div class="pdf-footer">SentinelCareAI — Herramienta de apoyo emocional · No sustituye atención profesional</div>
+<\/body><\/html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+}
+</script>
+
+<!-- ══════════════════════════════════════════════
+     PWA — SERVICE WORKER + BANNER DE INSTALACIÓN
+══════════════════════════════════════════════ -->
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/SentinelCareAI/sw.js')
-      .then(reg => {
-        console.log('SW registrado:', reg.scope);
-
-        // Mostrar banner de "instalar app" cuando el navegador lo permita
-        let deferredPrompt = null;
-        window.addEventListener('beforeinstallprompt', e => {
-          e.preventDefault();
-          deferredPrompt = e;
-          showInstallBanner();
-        });
-
-        window.addEventListener('appinstalled', () => {
-          hideInstallBanner();
-          deferredPrompt = null;
-        });
-
-        window.installApp = async () => {
-          if (!deferredPrompt) return;
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          if (outcome === 'accepted') hideInstallBanner();
-          deferredPrompt = null;
-        };
-      })
+    // Ruta relativa — funciona tanto en local como en GitHub Pages
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('SW registrado ✓'))
       .catch(err => console.warn('SW no registrado:', err));
   });
+
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBanner();
+  });
+  window.addEventListener('appinstalled', () => {
+    hideInstallBanner();
+    deferredPrompt = null;
+  });
+  window.installApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') hideInstallBanner();
+    deferredPrompt = null;
+  };
 }
 
 function showInstallBanner() {
-  if (document.getElementById('pwa-install-banner')) return;
-  const banner = document.createElement('div');
-  banner.id = 'pwa-install-banner';
-  banner.innerHTML = `
-    <div style="
-      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-      background: var(--card-bg); border: 1.5px solid var(--border);
-      border-radius: 18px; padding: 14px 20px; box-shadow: var(--shadow-hover);
-      display: flex; align-items: center; gap: 14px; z-index: 9000;
-      max-width: 340px; width: 90%; backdrop-filter: blur(16px);
-      animation: fadeIn 0.4s ease;
-    ">
-      <div style="
-        width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
-        background: linear-gradient(135deg, var(--sage), var(--teal));
-        display: flex; align-items: center; justify-content: center;
-        font-size: 22px; color: white;
-      ">💚</div>
-      <div style="flex: 1; min-width: 0;">
-        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark); margin-bottom: 2px;">
-          Instalar SentinelCare
-        </div>
-        <div style="font-size: 0.78rem; color: var(--text-mid); line-height: 1.4;">
-          Accede más rápido desde tu pantalla de inicio
-        </div>
+  if (document.getElementById('pwa-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'pwa-banner';
+  b.innerHTML = `
+    <div style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+      background:var(--card-bg);border:1.5px solid var(--border);border-radius:18px;
+      padding:14px 18px;box-shadow:var(--shadow-hover);display:flex;align-items:center;
+      gap:14px;z-index:9000;max-width:340px;width:90%;backdrop-filter:blur(16px);
+      animation:fadeIn 0.4s ease;">
+      <div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;
+        background:linear-gradient(135deg,var(--sage),var(--teal));
+        display:flex;align-items:center;justify-content:center;font-size:22px;">💚</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:0.9rem;color:var(--text-dark);margin-bottom:2px;">Instalar SentinelCare</div>
+        <div style="font-size:0.78rem;color:var(--text-mid);line-height:1.4;">Accede más rápido desde tu pantalla de inicio</div>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
-        <button onclick="installApp()" style="
-          background: linear-gradient(135deg, var(--sage), var(--teal));
-          border: none; border-radius: 10px; padding: 7px 14px;
-          color: white; font-size: 0.8rem; font-weight: 600;
-          cursor: pointer; font-family: 'DM Sans', sans-serif;
-        ">Instalar</button>
-        <button onclick="hideInstallBanner()" style="
-          background: none; border: 1px solid var(--border);
-          border-radius: 10px; padding: 5px 14px; color: var(--text-light);
-          font-size: 0.75rem; cursor: pointer; font-family: 'DM Sans', sans-serif;
-        ">Ahora no</button>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <button onclick="installApp()" style="background:linear-gradient(135deg,var(--sage),var(--teal));
+          border:none;border-radius:10px;padding:7px 14px;color:white;font-size:0.8rem;
+          font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Instalar</button>
+        <button onclick="hideInstallBanner()" style="background:none;border:1px solid var(--border);
+          border-radius:10px;padding:5px 14px;color:var(--text-light);font-size:0.75rem;
+          cursor:pointer;font-family:'DM Sans',sans-serif;">Ahora no</button>
       </div>
-    </div>
-  `;
-  document.body.appendChild(banner);
+    </div>`;
+  document.body.appendChild(b);
 }
 
 function hideInstallBanner() {
-  const b = document.getElementById('pwa-install-banner');
+  const b = document.getElementById('pwa-banner');
   if (b) b.remove();
 }
 </script>
