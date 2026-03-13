@@ -1,6 +1,6 @@
 name = "sentinel-proxy"
 main = "worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-01-01"
 
 # La API key se agrega como secret (NUNCA en este archivo):
 #   wrangler secret put GROQ_API_KEY
@@ -8,3 +8,9 @@ compatibility_date = "2024-01-01"
 # Variables de entorno NO sensibles (opcionales):
 # [vars]
 # APP_ENV = "production"
+
+# ── Observability — logs automáticos en Cloudflare Dashboard (sin costo) ──
+# Permite ver request logs, errores y tiempos de respuesta en tiempo real.
+# Dashboard → Workers → sentinel-proxy → Logs
+[observability]
+enabled = true

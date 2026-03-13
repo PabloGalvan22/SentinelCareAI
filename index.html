@@ -15,12 +15,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.0.2/wordcloud2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- DOMPurify: sanitiza el HTML generado por marked.parse() antes de inyectarlo al DOM -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 
 <style>
 :root {
@@ -2826,20 +2825,19 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       Ingresa la contraseña para continuar.
     </p>
 
-    <div class="pro-access-field">
+    <form class="pro-access-field" onsubmit="verifyProAccess(); return false;" autocomplete="on">
       <input
         type="password"
         id="pro-access-input"
         class="pro-access-input"
         placeholder="••••••••••••"
         autocomplete="current-password"
-        onkeydown="if(event.key==='Enter') verifyProAccess()"
         oninput="document.getElementById('pro-access-error').classList.remove('show')"
       >
-      <button class="pro-access-eye" onclick="toggleProAccessEye()" title="Mostrar">
+      <button type="button" class="pro-access-eye" onclick="toggleProAccessEye()" title="Mostrar">
         <i class="fas fa-eye" id="pro-access-eye-icon"></i>
       </button>
-    </div>
+    </form>
 
     <p class="pro-access-error" id="pro-access-error">
       <i class="fas fa-circle-xmark"></i>&nbsp; Contraseña incorrecta.
@@ -3693,7 +3691,50 @@ async function verifyProAccess() {
   }
 }
 
+// ── CARGA DIFERIDA — Herramientas pesadas del módulo profesional (~4 MB) ──────
+// xlsx (~1.7 MB), WordCloud2 (~0.5 MB) y Tesseract.js (~2 MB) solo se cargan
+// cuando el usuario entra efectivamente a la pantalla profesional.
+let _proToolsLoaded  = false;
+let _proToolsLoading = false;
+
+function loadProTools(callback) {
+  if (_proToolsLoaded) { if (callback) callback(); return; }
+  if (_proToolsLoading) {
+    document.addEventListener('sentinelProToolsReady', function _h() {
+      document.removeEventListener('sentinelProToolsReady', _h);
+      if (callback) callback();
+    });
+    return;
+  }
+  _proToolsLoading = true;
+  var urls = [
+    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.0.2/wordcloud2.min.js',
+    'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js',
+  ];
+  var loaded = 0;
+  urls.forEach(function(src) {
+    var s = document.createElement('script');
+    s.src = src; s.async = true;
+    s.onload = s.onerror = function() {
+      loaded++;
+      if (loaded === urls.length) {
+        _proToolsLoaded = true; _proToolsLoading = false;
+        document.dispatchEvent(new Event('sentinelProToolsReady'));
+        if (callback) callback();
+      }
+    };
+    document.head.appendChild(s);
+  });
+}
+
+
 function _launchProfessional(profile) {
+  // Garantiza que xlsx, WordCloud2 y Tesseract estén listos antes de renderizar
+  loadProTools(function() { _doLaunchProfessional(profile); });
+}
+
+function _doLaunchProfessional(profile) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('s-professional').classList.add('active');
   const badge    = document.getElementById('pro-badge');
@@ -4239,75 +4280,111 @@ function updateTable(results) {
 // ══════════════════════════════════════════════
 let llmValidations = {};
 
+// ── LLM VALIDATION — procesa TODOS los casos en lotes de 15 ──────────────
+// Antes: slice(0, 15) silencioso → casos >15 sin validar ni avisar.
+// Ahora: lotes secuenciales con progreso visible en el banner.
+const LLM_BATCH_SIZE = 15;
+
 async function runLLMValidation(casosAltos) {
   if (!casosAltos.length) return;
+
+  const total      = casosAltos.length;
+  const numBatches = Math.ceil(total / LLM_BATCH_SIZE);
 
   const container = document.getElementById('proTableContainer');
   const banner = document.createElement('div');
   banner.className = 'validation-header';
   banner.id = 'validation-banner';
-  banner.innerHTML = '<div class="val-spinner"></div> <span>Validando <strong>' + casosAltos.length + '</strong> caso(s) ALTO/EXTREMO con IA para reducir falsos positivos…</span>';
   container.insertBefore(banner, container.firstChild);
 
-  const sample = casosAltos.slice(0, 15);
-  const casosStr = sample.map(r =>
-    `ID:${r.ID} | Score:${r.Score} | Texto: "${r.Texto.slice(0, 180)}"`
-  ).join('\n');
-
-  const prompt = `Eres un psicólogo clínico. Revisa estos textos clasificados como ALTO o EXTREMO riesgo por un detector automático de palabras clave. Para cada uno, decide si el riesgo es REAL o es un FALSO_POSITIVO (contexto cotidiano, metáfora, broma, contexto académico/médico, etc.).
-
-TEXTOS A VALIDAR:
-${casosStr}
-
-Responde ÚNICAMENTE con un JSON array con este formato exacto, sin texto adicional ni bloques de código:
-[{"id": 1, "veredicto": "REAL", "razon": "breve justificación"}, ...]
-
-Usa solo "REAL" o "FALSO_POSITIVO" como veredicto. Razón máx. 12 palabras.`;
-
-  try {
-    const response = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 800
-      })
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error((data.error && data.error.message) || 'Error API');
-    const raw = data.choices[0].message.content.trim()
-      .replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
-    const parsed = JSON.parse(raw);
-
-    parsed.forEach(item => {
-      const status = item.veredicto === 'REAL' ? 'confirmed' : 'false_positive';
-      llmValidations[item.id] = { status, reason: item.razon || '' };
-      const cell = document.getElementById('val-cell-' + item.id);
-      if (cell) {
-        cell.innerHTML = status === 'confirmed'
-          ? `<span class="val-badge val-confirmed" title="${item.razon||''}"><i class="fas fa-circle-exclamation"></i> Confirmado</span>`
-          : `<span class="val-badge val-false-pos" title="${item.razon||''}"><i class="fas fa-circle-check"></i> Posible FP</span>`;
-      }
-    });
-
-    const confirmed = parsed.filter(i => i.veredicto === 'REAL').length;
-    const fp = parsed.length - confirmed;
-    const b = document.getElementById('validation-banner');
-    if (b) b.innerHTML = '<i class="fas fa-robot"></i> <span>Validación IA: <strong style="color:#ff6b5b;">' + confirmed + ' confirmados</strong> · <strong style="color:#6fbf73;">' + fp + ' posibles falsos positivos</strong> — pasa el cursor sobre cada badge para ver la razón</span>';
-
-  } catch (err) {
-    casosAltos.forEach(r => {
-      const cell = document.getElementById('val-cell-' + r.ID);
-      if (cell) cell.innerHTML = '';
-    });
-    const b = document.getElementById('validation-banner');
-    if (b) b.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:#e8c48a;"></i> <span style="color:#808090;">Validación IA no disponible — revisa manualmente los casos marcados.</span>';
-    console.warn('LLM validation failed:', err);
+  function setBannerProgress(done, of) {
+    const pct = Math.round((done / of) * 100);
+    banner.innerHTML =
+      '<div class="val-spinner"></div> <span>Validando con IA — lote ' + done + ' de ' + of +
+      ' (' + pct + '%) &nbsp;<span style="font-size:0.78rem;color:#808090;">' +
+      (of > 1 ? total + ' casos en ' + of + ' lotes de ' + LLM_BATCH_SIZE : total + ' caso(s)') +
+      '</span></span>';
   }
-}
 
+  let totalConfirmed = 0;
+  let totalFP        = 0;
+  let totalErrors    = 0;
+
+  for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
+    setBannerProgress(batchIdx + 1, numBatches);
+
+    const batch    = casosAltos.slice(batchIdx * LLM_BATCH_SIZE, (batchIdx + 1) * LLM_BATCH_SIZE);
+    const casosStr = batch.map(r =>
+      'ID:' + r.ID + ' | Score:' + r.Score + ' | Texto: "' + r.Texto.slice(0, 180) + '"'
+    ).join('\n');
+
+    const prompt =
+      'Eres un psicólogo clínico. Revisa estos textos clasificados como ALTO o EXTREMO riesgo por un detector automático de palabras clave. ' +
+      'Para cada uno, decide si el riesgo es REAL o es un FALSO_POSITIVO (contexto cotidiano, metáfora, broma, contexto académico/médico, etc.).\n\n' +
+      'TEXTOS A VALIDAR:\n' + casosStr + '\n\n' +
+      'Responde ÚNICAMENTE con un JSON array con este formato exacto, sin texto adicional ni bloques de código:\n' +
+      '[{"id": 1, "veredicto": "REAL", "razon": "breve justificación"}, ...]\n\n' +
+      'Usa solo "REAL" o "FALSO_POSITIVO" como veredicto. Razón máx. 12 palabras.';
+
+    try {
+      const response = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: Math.min(80 * batch.length + 100, 1800)
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error((data.error && data.error.message) || 'Error API lote ' + (batchIdx + 1));
+
+      const raw = data.choices[0].message.content.trim()
+        .replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+      const parsed = JSON.parse(raw);
+
+      parsed.forEach(function(item) {
+        const status = item.veredicto === 'REAL' ? 'confirmed' : 'false_positive';
+        llmValidations[item.id] = { status: status, reason: item.razon || '' };
+        const cell = document.getElementById('val-cell-' + item.id);
+        if (cell) {
+          if (status === 'confirmed') {
+            cell.innerHTML = '<span class="val-badge val-confirmed" title="' + (item.razon || '') + '"><i class="fas fa-circle-exclamation"></i> Confirmado</span>';
+          } else {
+            cell.innerHTML = '<span class="val-badge val-false-pos" title="' + (item.razon || '') + '"><i class="fas fa-circle-check"></i> Posible FP</span>';
+          }
+        }
+        if (status === 'confirmed') totalConfirmed++; else totalFP++;
+      });
+
+    } catch (err) {
+      batch.forEach(function(r) {
+        const cell = document.getElementById('val-cell-' + r.ID);
+        if (cell) cell.innerHTML =
+          '<span class="val-badge" style="background:rgba(232,196,138,0.15);color:#e8c48a;border:1px solid rgba(232,196,138,0.3);" ' +
+          'title="Error de validación — revisa manualmente"><i class="fas fa-triangle-exclamation"></i> Manual</span>';
+        totalErrors++;
+      });
+      console.warn('LLM validation error (lote ' + (batchIdx + 1) + '):', err);
+    }
+
+    // Pausa entre lotes para no saturar el rate limiter (30 req/min en el worker)
+    if (batchIdx < numBatches - 1) await new Promise(function(r) { setTimeout(r, 1200); });
+  }
+
+  // Banner final con resumen global
+  const b = document.getElementById('validation-banner');
+  if (!b) return;
+  const parts = [];
+  if (totalConfirmed) parts.push('<strong style="color:#ff6b5b;">' + totalConfirmed + ' confirmado' + (totalConfirmed > 1 ? 's' : '') + '</strong>');
+  if (totalFP)        parts.push('<strong style="color:#6fbf73;">'  + totalFP        + ' posible'   + (totalFP        > 1 ? 's' : '') + ' FP</strong>');
+  if (totalErrors)    parts.push('<strong style="color:#e8c48a;">'  + totalErrors    + ' sin validar (error)</strong>');
+  b.innerHTML =
+    '<i class="fas fa-robot"></i> <span>Validación IA (' + total + ' casos): ' +
+    (parts.length ? parts.join(' · ') : 'Completada') +
+    ' — pasa el cursor sobre cada badge para ver la razón</span>';
+}
 function updateWordCloud(keywords) {
   const canvas = document.getElementById('wordcloud-canvas');
   if (!canvas) return;
@@ -4341,7 +4418,7 @@ async function runIAAnalysis() {
 
   const muestrasAlto = casosAlto.slice(0, 5).map((r, i) =>
     `Caso ${i+1} [Score ${r.Score}]: "${r.Texto.slice(0, 120)}${r.Texto.length > 120 ? '…' : ''}" — Indicadores: ${r.Detalles}`
-  ).join('\\n');
+  ).join('\n');
 
   const prompt = `Eres un psicólogo clínico experto en detección de riesgo suicida y bienestar emocional. Se te presenta el resultado de un análisis automatizado de mensajes o respuestas escritas.
 
@@ -4381,7 +4458,7 @@ Escribe en español, con tono clínico pero accesible. Usa los encabezados en ne
     if (!reply) throw new Error('Respuesta vacía');
 
     // Render with marked.js for proper headings, lists, bold, etc.
-    const formatted = marked.parse(reply);
+    const formatted = DOMPurify.sanitize(marked.parse(reply));
 
     box.innerHTML = '<div style="color:#d0d0d0;font-size:0.92rem;line-height:1.8;" class="md-body ia-md">' + formatted + '</div>'
       + '<div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(232,196,138,0.2);font-size:0.78rem;color:#606070;">'
@@ -4743,6 +4820,11 @@ const PROXY_BASE_URL = 'https://sentinel-proxy.sentinelpablo.workers.dev';
 const GROQ_URL       = PROXY_BASE_URL + '/chat';
 const GROQ_MODEL     = 'llama-3.3-70b-versatile';
 
+// SYSTEM_PROMPT: se envía desde el cliente como fallback de seguridad.
+// El Cloudflare Worker SIEMPRE lo filtra y sobreescribe con su versión
+// autoritativa, por lo que el valor aquí nunca llega intacto a Groq.
+// Tener la variable en el cliente garantiza que el chat funcione incluso
+// si el worker está desactualizado o se usa en entorno local.
 const SYSTEM_PROMPT = `Eres un asistente de apoyo emocional llamado "Aura", parte de "SentinelCareAI". Tu misión es ofrecer compañía empática y cálida, como un amigo que escucha sin juzgar. Tu prioridad es que la persona se sienta comprendida y validada.
 
 MEMORIA Y COHERENCIA — MUY IMPORTANTE:
@@ -4765,7 +4847,6 @@ Pautas de tono:
 Ejemplo de tono adecuado:
 - "Gracias por compartir eso conmigo. Debe ser muy pesado llevar todo eso. Estoy aquí para lo que necesites."
 - "Parece que estás pasando por un momento complicado. ¿Quieres contarme más sobre cómo te sientes?"`;
-
 // Cuando se detecte que el perfil es 'padre', se puede añadir un prefijo al prompt o cambiar el system prompt
 // Pero lo dejamos igual, ya que el chatbot es adaptable. La función openParentChat ya establece currentProfile='padre'.
 
@@ -5008,7 +5089,7 @@ function appendMessageSilent(role, text, savedTime) {
 
   const avatarIcon   = role === 'ai' ? 'fas fa-heart' : 'fas fa-user';
   const renderedText = role === 'ai'
-    ? '<div class="md-body">' + marked.parse(text) + '</div>'
+    ? '<div class="md-body">' + DOMPurify.sanitize(marked.parse(text)) + '</div>'
     : text.replace(/\n/g, '<br>');
   const timeStr = savedTime || '';
 
@@ -5052,7 +5133,7 @@ function appendMessage(role, text, fileInfo) {
   const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
 
   const renderedText = role === 'ai'
-    ? '<div class="md-body">' + marked.parse(text) + '</div>'
+    ? '<div class="md-body">' + DOMPurify.sanitize(marked.parse(text)) + '</div>'
     : text.replace(/\n/g, '<br>');
   div.innerHTML = '<div class="msg-avatar"><i class="' + avatarIcon + '"></i></div>'
     + '<div class="msg-bubble">' + fileHtml + renderedText + crisisHtml
@@ -5382,6 +5463,8 @@ async function sendMessage() {
   renderFilePreviews();
   document.getElementById('chat-send-btn').disabled = true;
 
+  // El system prompt lo inyecta el Worker server-side;
+  // aquí solo enviamos el historial de usuario/asistente.
   const groqMessages = [{ role: 'system', content: SYSTEM_PROMPT }];
 
   chatHistory.forEach(function(m) {
