@@ -6,6 +6,9 @@
 <title>SentinelCareAI — Contigo Siempre</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#3d7a8a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -2826,6 +2829,9 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
     </p>
 
     <form class="pro-access-field" onsubmit="verifyProAccess(); return false;" autocomplete="on">
+      <!-- Hidden username field: required by browsers for password autocomplete/accessibility -->
+      <input type="text" name="username" value="profesional"
+             autocomplete="username" style="display:none" aria-hidden="true" tabindex="-1">
       <input
         type="password"
         id="pro-access-input"
