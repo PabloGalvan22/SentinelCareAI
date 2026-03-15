@@ -1,18 +1,14 @@
 # SentinelCareAI — Contigo Siempre
 
+> Apoyo emocional con inteligencia artificial, detección de riesgo y acompañamiento personalizado. Todo local, todo privado.
 > Plataforma PWA de apoyo emocional y detección de riesgo con inteligencia artificial.
 > Diseñada para el contexto hispanohablante mexicano.
+
 
 ![Versión](https://img.shields.io/badge/versión-2.2-teal)
 ![PWA](https://img.shields.io/badge/PWA-ready-blue)
 ![Modelo](https://img.shields.io/badge/modelo-Llama%203.3%2070B-orange)
 ![Offline](https://img.shields.io/badge/offline-compatible-green)
-
----
-
-# SentinelCareAI — Contigo Siempre
-
-> Apoyo emocional con inteligencia artificial, detección de riesgo y acompañamiento personalizado. Todo local, todo privado.
 
 ---
 
