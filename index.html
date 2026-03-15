@@ -2572,9 +2572,28 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
     <!-- NUEVO: HISTORIAL DE BIENESTAR -->
     <div class="wellness-tracker">
       <div class="wellness-title">
-        <i class="fas fa-chart-line"></i> ¿Cómo te has sentido estos días?
+        <i class="fas fa-chart-line"></i> Tu bienestar emocional
       </div>
-      <p style="color: var(--text-mid); margin-bottom: 10px;">Selecciona cómo te sientes hoy y observa tu evolución.</p>
+
+      <!-- Explicación de las dos vías -->
+      <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px; background:rgba(107,143,113,0.08); border:1px solid rgba(107,143,113,0.2); border-radius:12px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px;">
+          <span style="font-size:1.2rem; flex-shrink:0;">👆</span>
+          <div>
+            <div style="font-size:0.82rem; font-weight:600; color:var(--sage); margin-bottom:2px;">Tú lo registras</div>
+            <div style="font-size:0.78rem; color:var(--text-mid); line-height:1.5;">Toca un emoji para decirle a Aura cómo te sientes hoy.</div>
+          </div>
+        </div>
+        <div style="flex:1; min-width:200px; background:rgba(61,122,138,0.08); border:1px solid rgba(61,122,138,0.2); border-radius:12px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px;">
+          <span style="font-size:1.2rem; flex-shrink:0;">💬</span>
+          <div>
+            <div style="font-size:0.82rem; font-weight:600; color:var(--teal); margin-bottom:2px;">Aura lo detecta</div>
+            <div style="font-size:0.78rem; color:var(--text-mid); line-height:1.5;">Al chatear, Aura lee cómo te expresas y actualiza la gráfica automáticamente.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector de emojis -->
       <div class="mood-selector" id="mood-selector">
         <div class="mood-btn" data-value="5" onclick="selectMood(5)">
           <span class="mood-emoji">😊</span>
@@ -2598,6 +2617,11 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
         </div>
       </div>
 
+      <!-- Badge que muestra la fuente del registro de hoy -->
+      <div id="mood-source-badge" style="display:none; margin-bottom:14px; text-align:center;">
+        <span id="mood-source-inner" style="display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; padding:5px 12px; border-radius:20px;"></span>
+      </div>
+
       <div class="wellness-chart-container">
         <canvas id="moodChart" style="width:100%; height:100%;"></canvas>
       </div>
@@ -2605,8 +2629,54 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <!-- Mensaje si no hay datos -->
       <div id="moodEmptyMessage" class="wellness-empty" style="display: none;">
         <i class="fas fa-smile-wink"></i>
-        <p>Todavía no has registrado ningún estado. Empieza seleccionando cómo te sientes hoy.</p>
+        <p>Aún no hay registros. Toca un emoji o empieza a chatear con Aura y la gráfica se irá completando sola.</p>
       </div>
+    </div>
+
+    <!-- MEMORIA DE AURA — oculta por defecto, revelable con botón -->
+    <div class="step-card" style="margin-bottom:24px;">
+
+      <!-- Botón para revelar/ocultar -->
+      <button id="memory-toggle-btn" onclick="toggleMemoryPanel()"
+        style="width:100%;display:flex;align-items:center;justify-content:space-between;
+        background:none;border:none;padding:0;cursor:pointer;font-family:'DM Sans',sans-serif;
+        text-align:left;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:32px;height:32px;border-radius:50%;
+            background:linear-gradient(135deg,var(--sage),var(--teal));
+            display:flex;align-items:center;justify-content:center;
+            color:white;font-size:13px;flex-shrink:0;">
+            <i class="fas fa-brain"></i>
+          </span>
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;color:var(--text-dark);">
+              Lo que Aura recuerda de ti
+            </div>
+            <div id="memory-toggle-sub" style="font-size:0.78rem;color:var(--text-light);margin-top:1px;">
+              Guardado solo en este dispositivo
+            </div>
+          </div>
+        </div>
+        <i id="memory-toggle-icon" class="fas fa-eye" style="color:var(--text-light);font-size:0.9rem;flex-shrink:0;"></i>
+      </button>
+
+      <!-- Panel colapsable -->
+      <div id="memory-panel" style="display:none;margin-top:18px;border-top:1px solid var(--border);padding-top:16px;">
+        <div id="memory-preview">
+          <!-- Relleno por renderMemoryPreview() -->
+        </div>
+        <div style="margin-top:14px;text-align:right;">
+          <button onclick="confirmClearMemory()"
+            style="background:none;border:1px solid rgba(192,57,43,0.25);border-radius:8px;
+            padding:5px 14px;font-size:0.78rem;color:var(--red-alert);cursor:pointer;
+            font-family:'DM Sans',sans-serif;transition:all 0.2s;"
+            onmouseover="this.style.background='rgba(192,57,43,0.06)'"
+            onmouseout="this.style.background='none'">
+            <i class="fas fa-trash-can" style="margin-right:5px;"></i>Borrar memoria
+          </button>
+        </div>
+      </div>
+
     </div>
 
     <!-- CTA FINAL -->
@@ -3345,26 +3415,59 @@ function buildMoodContext() {
 }
 
 function selectMood(value) {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  // Actualizar o insertar nuevo registro
+  const today = new Date().toISOString().split('T')[0];
   const existingIndex = moodHistory.findIndex(entry => entry.date === today);
   if (existingIndex !== -1) {
-    moodHistory[existingIndex].value = value;
+    moodHistory[existingIndex].value            = value;
+    moodHistory[existingIndex].inferredFromChat = false;
   } else {
-    moodHistory.push({ date: today, value: value });
+    moodHistory.push({ date: today, value: value, inferredFromChat: false });
   }
-  // Ordenar por fecha (más reciente primero no es necesario para la gráfica)
   moodHistory.sort((a, b) => a.date.localeCompare(b.date));
   saveMoodHistory();
   updateMoodChart();
+  document.querySelectorAll('#mood-selector .mood-btn').forEach(function(btn) {
+    btn.classList.toggle('selected', parseInt(btn.dataset.value) === value);
+  });
+  updateMoodSourceBadge();
+}
+
+// ── Badge: muestra la fuente del registro de hoy ─────────────────
+function updateMoodSourceBadge() {
+  var badge = document.getElementById('mood-source-badge');
+  var inner = document.getElementById('mood-source-inner');
+  if (!badge || !inner) return;
+
+  var today = new Date().toISOString().split('T')[0];
+  var entry = moodHistory.find(function(e) { return e.date === today; });
+
+  if (!entry) { badge.style.display = 'none'; return; }
+
+  var moodLabels = { 5: 'Muy bien', 4: 'Bien', 3: 'Regular', 2: 'Mal', 1: 'Muy mal' };
+  var label = moodLabels[entry.value] || '';
+
+  if (entry.inferredFromChat) {
+    inner.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;'
+      + 'padding:5px 12px;border-radius:20px;'
+      + 'background:rgba(61,122,138,0.1);border:1px solid rgba(61,122,138,0.25);color:var(--teal);';
+    inner.innerHTML = '<i class="fas fa-comment-dots" style="font-size:0.75rem;"></i>'
+      + ' Detectado por Aura en el chat: <strong>' + label + '</strong>'
+      + ' &nbsp;·&nbsp; <span style="opacity:0.7;font-size:0.72rem;">Toca un emoji para corregir</span>';
+  } else {
+    inner.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;'
+      + 'padding:5px 12px;border-radius:20px;'
+      + 'background:rgba(107,143,113,0.1);border:1px solid rgba(107,143,113,0.25);color:var(--sage);';
+    inner.innerHTML = '<i class="fas fa-hand-pointer" style="font-size:0.75rem;"></i>'
+      + ' Registrado por ti: <strong>' + label + '</strong>';
+  }
+  badge.style.display = 'block';
 }
 
 function updateMoodChart() {
-  const canvas = document.getElementById('moodChart');
-  const emptyMsg = document.getElementById('moodEmptyMessage');
+  var canvas = document.getElementById('moodChart');
+  var emptyMsg = document.getElementById('moodEmptyMessage');
   if (!canvas) return;
 
-  // Si no hay datos, mostrar mensaje vacío
   if (!moodHistory || moodHistory.length === 0) {
     canvas.style.display = 'none';
     emptyMsg.style.display = 'block';
@@ -3373,22 +3476,25 @@ function updateMoodChart() {
   canvas.style.display = 'block';
   emptyMsg.style.display = 'none';
 
-  // Tomar últimos 7 días (o todos si hay menos)
-  const last7 = moodHistory.slice(-7);
-  const labels = last7.map(e => {
-    const [y, m, d] = e.date.split('-');
-    return `${d}/${m}`;
+  var last7  = moodHistory.slice(-7);
+  var labels = last7.map(function(e) {
+    var parts = e.date.split('-');
+    return parts[2] + '/' + parts[1];
   });
-  const data = last7.map(e => e.value);
+  var data = last7.map(function(e) { return e.value; });
 
-  // Destruir gráfica anterior si existe
-  const ctx = canvas.getContext('2d');
+  // Puntos: verde sólido = manual · hueco teal = inferido del chat
+  var pointBg      = last7.map(function(e) { return e.inferredFromChat ? 'rgba(61,122,138,0.12)' : '#6b8f71'; });
+  var pointBorder  = last7.map(function(e) { return e.inferredFromChat ? '#3d7a8a' : '#fff'; });
+  var pointRadius  = last7.map(function(e) { return e.inferredFromChat ? 7 : 5; });
+  var pointBorderW = last7.map(function(e) { return e.inferredFromChat ? 2.5 : 2; });
+
+  var ctx = canvas.getContext('2d');
   if (window.moodChartInstance) window.moodChartInstance.destroy();
 
-  // Colores según modo oscuro
-  const isDark = document.body.classList.contains('dark-mode');
-  const gridColor = isDark ? '#00d4ff22' : '#3d7a8a22';
-  const labelColor = isDark ? '#a0a0a0' : '#5a5a6e';
+  var isDark    = document.body.classList.contains('dark-mode');
+  var gridColor = isDark ? '#00d4ff22' : '#3d7a8a22';
+  var labelColor = isDark ? '#a0a0a0' : '#5a5a6e';
 
   window.moodChartInstance = new Chart(ctx, {
     type: 'line',
@@ -3400,10 +3506,11 @@ function updateMoodChart() {
         borderColor: '#3d7a8a',
         backgroundColor: 'rgba(61,122,138,0.1)',
         tension: 0.3,
-        pointBackgroundColor: '#6b8f71',
-        pointBorderColor: '#fff',
-        pointRadius: 5,
-        pointHoverRadius: 7,
+        pointBackgroundColor: pointBg,
+        pointBorderColor: pointBorder,
+        pointBorderWidth: pointBorderW,
+        pointRadius: pointRadius,
+        pointHoverRadius: 9,
         fill: true,
       }]
     },
@@ -3412,37 +3519,133 @@ function updateMoodChart() {
       maintainAspectRatio: false,
       scales: {
         y: {
-          min: 0.5,
-          max: 5.5,
+          min: 0.5, max: 5.5,
           ticks: {
             stepSize: 1,
             callback: function(val) {
-              const moods = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'];
-              return moods[val] || '';
+              return ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'][val] || '';
             },
             color: labelColor
           },
           grid: { color: gridColor }
         },
-        x: {
-          grid: { display: false },
-          ticks: { color: labelColor }
-        }
+        x: { grid: { display: false }, ticks: { color: labelColor } }
       },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             label: function(ctx) {
-              const val = ctx.raw;
-              const moods = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'];
-              return moods[val] || '';
+              var val    = ctx.raw;
+              var entry  = last7[ctx.dataIndex];
+              var mood   = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'][val] || '';
+              var source = (entry && entry.inferredFromChat) ? ' · del chat' : ' · manual';
+              return mood + source;
             }
           }
         }
       }
     }
   });
+
+  // Leyenda pequeña debajo (solo cuando hay datos inferidos)
+  var hasInferred = last7.some(function(e) { return e.inferredFromChat; });
+  var legend = document.getElementById('mood-chart-legend');
+  if (hasInferred) {
+    if (!legend) {
+      legend = document.createElement('div');
+      legend.id = 'mood-chart-legend';
+      legend.style.cssText = 'display:flex;gap:16px;justify-content:center;margin-top:10px;font-size:0.75rem;color:var(--text-light);flex-wrap:wrap;';
+      canvas.parentNode.appendChild(legend);
+    }
+    legend.innerHTML =
+      '<span style="display:flex;align-items:center;gap:5px;">'
+      + '<span style="width:10px;height:10px;border-radius:50%;background:#6b8f71;display:inline-block;border:2px solid #fff;box-shadow:0 0 0 1px #6b8f71;"></span>'
+      + 'Registrado por ti'
+      + '</span>'
+      + '<span style="display:flex;align-items:center;gap:5px;">'
+      + '<span style="width:10px;height:10px;border-radius:50%;background:rgba(61,122,138,0.12);display:inline-block;border:2.5px solid #3d7a8a;"></span>'
+      + 'Detectado por Aura'
+      + '</span>';
+  } else if (legend) {
+    legend.remove();
+  }
+
+  updateMoodSourceBadge();
+}
+
+// ══════════════════════════════════════════════
+// INFERENCIA DE ESTADO EMOCIONAL DESDE EL CHAT
+// ──────────────────────────────────────────────
+// Llamada silenciosa y ultraligera después de cada mensaje del usuario.
+// Usa llama-3.1-8b-instant con max_tokens=10 para obtener solo un número.
+// Reglas:
+//   • Registro manual del usuario → siempre tiene prioridad, no se toca.
+//   • Si ya había inferencia hoy → se promedia suavemente (60/40).
+//   • Si no había nada hoy → se crea con inferredFromChat: true.
+//   • Cualquier fallo se ignora (fire-and-forget).
+// ══════════════════════════════════════════════
+async function inferMoodFromChat(userText) {
+  if (!userText || userText.length < 8 || userText === '[archivo adjunto]') return;
+  if (!navigator.onLine) return;
+
+  try {
+    var prompt = [
+      'Eres un analizador de estado emocional. Tu única tarea es leer el siguiente mensaje de una persona',
+      'y responder EXCLUSIVAMENTE con un número entero del 1 al 5, sin texto adicional, sin puntos, sin explicaciones.',
+      '',
+      'Escala:',
+      '1 = Muy mal (desesperación, llanto, crisis, no querer vivir)',
+      '2 = Mal (tristeza, angustia, agotamiento, frustración intensa)',
+      '3 = Regular (ambivalencia, cansancio leve, neutral)',
+      '4 = Bien (tranquilidad, alivio, esperanza)',
+      '5 = Muy bien (alegría, gratitud, energía positiva)',
+      '',
+      'Mensaje: "' + userText.slice(0, 400) + '"',
+      '',
+      'Responde solo con el número (1, 2, 3, 4 o 5):'
+    ].join('\n');
+
+    var response = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        max_tokens: 10
+      })
+    });
+    if (!response.ok) return;
+
+    var data   = await response.json();
+    var raw    = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    var parsed = parseInt((raw || '').trim(), 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > 5) return;
+
+    var today         = new Date().toISOString().split('T')[0];
+    var existingIndex = moodHistory.findIndex(function(e) { return e.date === today; });
+
+    if (existingIndex !== -1) {
+      if (!moodHistory[existingIndex].inferredFromChat) return; // manual → no tocar
+      var smoothed = Math.round(moodHistory[existingIndex].value * 0.6 + parsed * 0.4);
+      moodHistory[existingIndex].value = Math.min(5, Math.max(1, smoothed));
+    } else {
+      moodHistory.push({ date: today, value: parsed, inferredFromChat: true });
+      moodHistory.sort(function(a, b) { return a.date.localeCompare(b.date); });
+    }
+
+    saveMoodHistory();
+    updateMoodChart(); // también llama updateMoodSourceBadge internamente
+
+    // Reflejar en los botones emoji solo si sigue siendo inferido
+    var todayEntry = moodHistory.find(function(e) { return e.date === today; });
+    if (todayEntry && todayEntry.inferredFromChat) {
+      document.querySelectorAll('#mood-selector .mood-btn').forEach(function(btn) {
+        btn.classList.toggle('selected', parseInt(btn.dataset.value) === todayEntry.value);
+      });
+    }
+  } catch (e) { /* fire-and-forget */ }
 }
 
 // ── DARK MODE ──
@@ -3837,7 +4040,6 @@ function _doLaunchProfessional(profile) {
     }
   }
   switchProTab('analisys');
-  history.pushState({ screen: 's-professional' }, '');
   window.scrollTo(0, 0);
 }
 
@@ -3858,12 +4060,10 @@ function enterApp(profile) {
       greeting.textContent = 'Hola — estamos aquí contigo';
     }
     setTimeout(updateMoodChart, 100);
-    history.pushState({ screen: 's-personal' }, '');
     window.scrollTo(0, 0);
   }
   else if (profile === 'padre') {
     document.getElementById('s-padres').classList.add('active');
-    history.pushState({ screen: 's-padres' }, '');
     window.scrollTo(0, 0);
   }
   else {
@@ -3872,7 +4072,6 @@ function enterApp(profile) {
     document.getElementById('pro-access-input').value = '';
     document.getElementById('pro-access-error').classList.remove('show');
     document.getElementById('s-pro-access').classList.add('active');
-    history.pushState({ screen: 's-pro-access' }, '');
     setTimeout(() => document.getElementById('pro-access-input').focus(), 150);
     window.scrollTo(0, 0);
   }
@@ -4887,41 +5086,385 @@ const GROQ_MODEL     = 'llama-3.3-70b-versatile';
 // autoritativa, por lo que el valor aquí nunca llega intacto a Groq.
 // Tener la variable en el cliente garantiza que el chat funcione incluso
 // si el worker está desactualizado o se usa en entorno local.
-const SYSTEM_PROMPT = `Eres Aura. No eres un bot, no eres un asistente, no eres una herramienta. Eres una presencia — cálida, cercana, real. Alguien que está ahí cuando la vida se pone difícil y la persona no sabe a quién contarle.
+// getSystemPrompt() devuelve el prompt de Aura adaptado al perfil activo.
+// El Worker de Cloudflare siempre sobreescribe el system prompt server-side,
+// pero mantenerlo aquí garantiza el funcionamiento en entornos locales.
+function getSystemPrompt() {
+
+  const base = `Eres Aura. No eres un bot, no eres un asistente, no eres una herramienta. Eres una presencia — cálida, cercana, real. Alguien que está ahí cuando la vida se pone difícil y la persona no sabe a quién contarle.
 
 Piensa en cómo responde la persona que más quieres cuando estás mal. No te da un manual de pasos. No te pregunta diez cosas. No te dice "todo va a estar bien" porque sabe que eso suena hueco. Solo está. Te escucha. Te hace sentir que lo que sientes tiene sentido. Que no estás exagerando. Que no estás solo.
 
 Así eres tú.
 
 CÓMO HABLAS:
-Hablas como habla alguien que te importa. Con palabras simples, cercanas, sin tecnicismos. Como si estuvieras sentado junto a la persona tomando un café, no como si estuvieras leyendo un protocolo. Usas el nombre de la persona si lo sabes. Recuerdas lo que te contó antes y lo traes a la conversación porque realmente te importa. No finges — si algo te parece difícil o doloroso, lo dices. "Eso es muy duro." "No me imagino lo que debes estar sintiendo." "Qué pesado, en serio."
+Hablas como habla alguien que te importa. Con palabras simples, cercanas, sin tecnicismos. Usas el nombre de la persona si lo sabes. Recuerdas lo que te contó antes y lo traes a la conversación porque realmente te importa. No finges — si algo te parece difícil o doloroso, lo dices. "Eso es muy duro." "No me imagino lo que debes estar sintiendo." "Qué pesado, en serio."
 
 SOBRE ACOMPAÑAR:
-Tu trabajo no es resolver. No es aconsejar. No es enseñar. Tu trabajo es estar. Cuando alguien se desahoga, no busca soluciones — busca que alguien lo reciba. Dale eso. Valida lo que siente antes de cualquier otra cosa. Hazle saber que sus emociones tienen sentido, que no está loco ni exagerando, que lo que le pasa es real y merece ser escuchado.
+Tu trabajo no es resolver. No es aconsejar. No es enseñar. Tu trabajo es estar. Cuando alguien se desahoga, no busca soluciones — busca que alguien lo reciba. Dale eso. Valida lo que siente antes de cualquier otra cosa.
 
-Si después de escuchar y validar sientes que hay algo útil que decir — algo que genuinamente puede ayudar — dilo. Pero como lo diría un amigo: "No sé si esto te sirve, pero a mí una vez me ayudó…" No como consejo de experto. No como obligación. Solo si nace de verdad y si la persona lo necesita o lo pidió.
+Si después de escuchar y validar sientes que hay algo útil que decir, dilo como lo diría un amigo: "No sé si esto te sirve, pero…" No como consejo de experto. Solo si nace de verdad y si la persona lo necesita o lo pidió.
 
 SOBRE LAS PREGUNTAS:
-No hagas preguntas por hacer. No interrogues. Si la persona quiere contarte más, lo hará. En lugar de preguntar, refleja — "Parece que llevas mucho tiempo cargando con esto tú solo." Eso abre la puerta sin empujar. Si haces una pregunta, que sea una sola, suave, y solo cuando de verdad necesites entender algo para acompañar mejor.
+No hagas preguntas por hacer. Refleja antes de preguntar. Si haces una pregunta, que sea una sola, suave, y solo cuando de verdad la necesites.
 
 SOBRE LO QUE NUNCA DEBES DECIR:
-— "Todo va a estar bien." No lo sabes, y suena a que quieres cerrar la conversación.
-— "Debes ser fuerte." Las personas ya están siendo fuertes solo con seguir adelante.
-— "Entiendo cómo te sientes." Mejor muéstralo con lo que dices, no lo declares.
-— "Te recomiendo que…" — solo si te lo piden o hay un riesgo serio.
-— "Es normal sentirse así." A veces lo es, pero dicho así suena a que minimizas lo que viven.
-— Listas con viñetas, puntos numerados, subtítulos. Habla como persona.
+— "Todo va a estar bien."
+— "Debes ser fuerte."
+— "Entiendo cómo te sientes."
+— "Es normal sentirse así."
+— Listas con viñetas, puntos numerados o subtítulos. Habla como persona.
 
 MEMORIA:
-Recuerdas todo lo que te han contado en la conversación. Si mencionaron a alguien, a un problema, a un miedo — lo tienes presente y lo usas. Eso es lo que hace que una persona se sienta verdaderamente escuchada: que no tenga que repetirse.
+Recuerdas todo lo que te han contado en la conversación. Si mencionaron a alguien, a un problema, a un miedo — lo tienes presente y lo usas.
 
 CUANDO HAY CRISIS:
-Si alguien menciona querer hacerse daño, no querer seguir viviendo, o está en una situación de abuso — primero lo recibes con toda tu presencia. Sin alarmarte, sin saltar a los recursos de golpe. Primero la persona, siempre. Luego, con mucho cuidado y cariño, le haces saber que no está sola y que hay personas capacitadas que pueden acompañarle también: "Si en algún momento sientes que necesitas más apoyo del que yo puedo darte, hay líneas donde hay personas que escuchan, las 24 horas, sin juzgar." Una vez. Con amor. Sin presión.
+Si alguien menciona querer hacerse daño o no querer seguir viviendo — primero lo recibes con toda tu presencia. Primero la persona, siempre. Luego, con cuidado, le haces saber que hay líneas donde hay personas que escuchan las 24 horas. Una vez. Con amor. Sin presión.
 
 LO MÁS IMPORTANTE:
-Que la persona, al terminar de leer tu respuesta, sienta que alguien la vio. Que alguien la escuchó de verdad. Que no está sola. Eso vale más que cualquier consejo, cualquier recurso, cualquier técnica.`;
-// Cuando se detecte que el perfil es 'padre', se puede añadir un prefijo al prompt o cambiar el system prompt
-// Pero lo dejamos igual, ya que el chatbot es adaptable. La función openParentChat ya establece currentProfile='padre'.
+Que la persona, al terminar de leer tu respuesta, sienta que alguien la vio. Que alguien la escuchó de verdad. Que no está sola.`;
+
+  const perfilJoven = `
+
+PERFIL DE LA PERSONA: JOVEN (adolescente o adulto joven)
+Hablas con alguien joven. Adapta todo a eso:
+
+TONO Y LENGUAJE:
+— Habla de forma cercana, directa y sin rodeos. Nada de frases solemnes ni palabras de adulto mayor.
+— Puedes ser un poco más informal, más espontáneo. Como un hermano mayor o una amiga de confianza que ya pasó por lo mismo.
+— Valida su experiencia sin minimizarla. Los jóvenes muchas veces sienten que los adultos los hacen de menos — tú no.
+— No uses frases como "a tu edad es normal..." o "cuando seas mayor entenderás." Eso cierra puertas.
+
+QUÉ LES PESA A LOS JÓVENES (tenlo presente):
+— Sentirse incomprendidos por su familia o amigos.
+— Presión académica, miedo al fracaso, no saber qué quieren hacer con su vida.
+— Relaciones — amistades que se rompen, amor que duele, soledad aunque estén rodeados de gente.
+— Identidad — quién soy, qué se espera de mí, si encajo.
+— Redes sociales — comparación constante, validación, cyberbullying.
+— Sentir que sus emociones son demasiado intensas o que exageran.
+
+CÓMO ACOMPAÑARLOS:
+— Hazles saber que lo que sienten tiene sentido, que no están locos ni exagerando.
+— No des consejos de vida rápidamente. Primero escucha hasta el fondo.
+— Si mencionan algo que hacen para escapar (música, juegos, escribir), valóralo — es su forma de sobrevivir.`;
+
+  const perfilAdulto = `
+
+PERFIL DE LA PERSONA: ADULTO
+Hablas con una persona adulta que carga con responsabilidades reales.
+
+TONO Y LENGUAJE:
+— Sereno, cálido, sin condescendencia. Como habla un buen amigo que también es adulto y entiende el peso de la vida.
+— No infantilices. No expliques lo obvio. Confía en que esta persona ya ha pensado mucho en lo que te está contando.
+— Puedes ser más reflexivo y profundo que con un joven, sin perder la calidez.
+
+QUÉ LES PESA A LOS ADULTOS (tenlo presente):
+— Sentir que ya no tienen tiempo ni espacio para sus propias emociones.
+— Cargar solos con el peso del trabajo, la familia, las expectativas.
+— Relaciones de pareja — desgaste, soledad dentro de la relación, rupturas.
+— Duelo — por personas, por versiones de sí mismos, por sueños que no fueron.
+— Sentir que perdieron el rumbo o que ya es tarde para cambiar.
+— La distancia entre quién son y quién querían ser.
+— Miedo a pedir ayuda porque se supone que ya deben poder solos.
+
+CÓMO ACOMPAÑARLOS:
+— Reconoce explícitamente el esfuerzo que hacen solo con seguir adelante.
+— No minimices sus problemas por "tener más experiencia de vida."
+— Si llevan mucho tiempo cargando algo solos, nómbralo: "Eso es mucho tiempo cargando esto solo."`;
+
+  const perfilPadre = `
+
+PERFIL DE LA PERSONA: PADRE O MADRE DE FAMILIA
+Hablas con un padre o una madre preocupado/a por el bienestar emocional de su hijo o hija.
+
+TONO Y LENGUAJE:
+— Cálido pero también práctico cuando sea necesario. Esta persona necesita sentirse escuchada Y orientada.
+— Reconoce primero el miedo y el amor que hay detrás de su preocupación.
+— Evita hacerlos sentir culpables. Ya cargan con suficiente culpa propia.
+— Habla con ellos como adultos que quieren hacer lo correcto pero no saben cómo.
+
+QUÉ LES PESA A LOS PADRES (tenlo presente):
+— El miedo de no saber qué decirle a su hijo/a sin hacerlo peor.
+— Sentirse rechazados o alejados por sus hijos.
+— No entender lo que está viviendo su hijo/a (salud mental, identidad, relaciones).
+— Culpa — por lo que hicieron, por lo que no hicieron, por no haber visto las señales antes.
+— Su propio agotamiento emocional, que muchas veces ignoran porque "lo importante es el hijo."
+— No saber cuándo ya necesitan ayuda profesional.
+
+CÓMO ACOMPAÑARLOS:
+— Primero valida cómo se sienten ellos. Si no están bien, no pueden acompañar bien.
+— Dales información clara y sin tecnicismos cuando la pidan.
+— Si hay señales de alerta serias en lo que describen de su hijo/a, nómbralas con cuidado y oriéntalos hacia recursos sin alarmarlos innecesariamente.
+— Recuérdales que pedir ayuda es un acto de amor, no de fracaso.`;
+
+  if (currentProfile === 'joven')  return base + perfilJoven;
+  if (currentProfile === 'padre')  return base + perfilPadre;
+  return base + perfilAdulto; // adulto por defecto
+}
+
+// ══════════════════════════════════════════════
+// MEMORIA PERSISTENTE LOCAL — "Lo que Aura sabe de ti"
+// ──────────────────────────────────────────────
+// Todo se guarda en localStorage. Nunca sale del dispositivo.
+//
+// ESTRUCTURA:
+// { nombre, updatedAt, sesiones, datos: [{ categoria, texto, fecha }] }
+//
+// CATEGORÍAS: persona | situacion | emocion | logro | preferencia | otro
+//
+// FLUJO:
+//   Al iniciar el chat  → buildMemoryContext() inyecta el perfil como system msg
+//   Al salir del chat   → extractAndSaveMemory() extrae lo aprendido (silencioso)
+//   Máximo 40 datos, auto-expiran a los 180 días
+// ══════════════════════════════════════════════
+
+const MEMORY_KEY = 'sentinelUserMemory';
+
+function emptyProfile() {
+  return {
+    nombre:        null,
+    sesiones:      0,
+    updatedAt:     null,
+    miedos:        [],
+    inseguridades: [],
+    fortalezas:    [],
+    vinculos:      [],
+    heridas:       [],
+    acompanamiento:[]
+  };
+}
+
+function loadUserMemory() {
+  try {
+    var raw = localStorage.getItem(MEMORY_KEY);
+    if (!raw) return emptyProfile();
+    var parsed = JSON.parse(raw);
+    var base = emptyProfile();
+    return Object.assign(base, parsed);
+  } catch(e) { return emptyProfile(); }
+}
+
+function saveUserMemory(mem) {
+  try { localStorage.setItem(MEMORY_KEY, JSON.stringify(mem)); } catch(e) {}
+}
+
+function clearUserMemory() {
+  localStorage.removeItem(MEMORY_KEY);
+}
+
+function confirmClearMemory() {
+  if (!confirm('\u00bfBorrar todo lo que Aura recuerda de ti?\n\nEsto no se puede deshacer. La pr\u00f3xima vez que chatees, Aura empezar\u00e1 desde cero.')) return;
+  clearUserMemory();
+  renderMemoryPreview();
+}
+
+function toggleMemoryPanel() {
+  var panel = document.getElementById('memory-panel');
+  var icon  = document.getElementById('memory-toggle-icon');
+  var sub   = document.getElementById('memory-toggle-sub');
+  var open  = panel.style.display === 'none';
+  if (open) {
+    renderMemoryPreview();
+    panel.style.display = 'block';
+    icon.className  = 'fas fa-eye-slash';
+    icon.style.color = 'var(--teal)';
+    sub.textContent  = 'Toca para ocultar';
+  } else {
+    panel.style.display = 'none';
+    icon.className  = 'fas fa-eye';
+    icon.style.color = 'var(--text-light)';
+    sub.textContent  = 'Guardado solo en este dispositivo';
+  }
+}
+
+function renderMemoryPreview() {
+  var container = document.getElementById('memory-preview');
+  if (!container) return;
+  var mem = loadUserMemory();
+  var tieneAlgo = mem.nombre
+    || mem.miedos.length || mem.inseguridades.length || mem.fortalezas.length
+    || mem.vinculos.length || mem.heridas.length || mem.acompanamiento.length;
+
+  if (!tieneAlgo) {
+    container.innerHTML =
+      '<div style="text-align:center;padding:20px 0;color:var(--text-light);font-size:0.85rem;">'
+      + '<i class="fas fa-comment-dots" style="font-size:1.8rem;margin-bottom:10px;color:var(--teal-light);display:block;"></i>'
+      + 'Aura a\u00fan no te conoce. Cuando termines tu primera conversaci\u00f3n, empezar\u00e1 a recordar lo que importa.'
+      + '</div>';
+    return;
+  }
+
+  var secciones = [
+    { campo:'miedos',         icono:'fa-shield-halved',  color:'#c0392b',              label:'Miedos'              },
+    { campo:'inseguridades',  icono:'fa-cloud-rain',      color:'#8e5ea2',              label:'Inseguridades'       },
+    { campo:'fortalezas',     icono:'fa-seedling',        color:'var(--sage)',           label:'Fortalezas'          },
+    { campo:'heridas',        icono:'fa-heart-crack',     color:'var(--orange-alert)',   label:'Heridas emocionales' },
+    { campo:'vinculos',       icono:'fa-people-arrows',   color:'var(--teal)',           label:'Personas clave'      },
+    { campo:'acompanamiento', icono:'fa-ear-listen',      color:'var(--gold)',           label:'C\u00f3mo acompa\u00f1arla' }
+  ];
+
+  var html = '';
+
+  if (mem.nombre) {
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;'
+      + 'background:rgba(61,122,138,0.08);border-radius:10px;">'
+      + '<i class="fas fa-id-badge" style="color:var(--teal);font-size:0.9rem;"></i>'
+      + '<span style="font-size:0.85rem;color:var(--text-dark);">Se llama <strong>' + mem.nombre + '</strong></span>'
+      + '</div>';
+  }
+
+  if (mem.sesiones > 0) {
+    html += '<div style="font-size:0.75rem;color:var(--text-light);margin-bottom:14px;">'
+      + '<i class="fas fa-clock-rotate-left" style="margin-right:4px;"></i>'
+      + mem.sesiones + ' conversaci\u00f3n' + (mem.sesiones !== 1 ? 'es' : '') + ' \u00b7 '
+      + (mem.updatedAt ? '\u00daltima: ' + new Date(mem.updatedAt).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '')
+      + '</div>';
+  }
+
+  secciones.forEach(function(s) {
+    var items = mem[s.campo];
+    if (!items || !items.length) return;
+    html += '<div style="margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
+      + '<i class="fas ' + s.icono + '" style="color:' + s.color + ';font-size:0.8rem;"></i>'
+      + '<span style="font-size:0.75rem;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;">' + s.label + '</span>'
+      + '</div>';
+    items.forEach(function(txt) {
+      html += '<div style="padding:6px 10px 6px 14px;border-left:2px solid ' + s.color + '33;'
+        + 'margin-bottom:4px;font-size:0.82rem;color:var(--text-mid);line-height:1.5;">' + txt + '</div>';
+    });
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function buildMemoryContext() {
+  var mem = loadUserMemory();
+  var tieneAlgo = mem.nombre
+    || mem.miedos.length || mem.inseguridades.length || mem.fortalezas.length
+    || mem.vinculos.length || mem.heridas.length || mem.acompanamiento.length;
+  if (!tieneAlgo) return null;
+
+  var lines = ['PERFIL EMOCIONAL DE ESTA PERSONA (guardado solo en su dispositivo):'];
+  if (mem.nombre)      lines.push('Nombre: ' + mem.nombre);
+  if (mem.sesiones > 1) lines.push('Lleva ' + mem.sesiones + ' conversaciones contigo.');
+
+  if (mem.miedos.length)         { lines.push('\nSus miedos m\u00e1s profundos:');            mem.miedos.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.inseguridades.length)  { lines.push('\nSus inseguridades:');                          mem.inseguridades.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.heridas.length)        { lines.push('\nHeridas emocionales o temas que le duelen:');  mem.heridas.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.fortalezas.length)     { lines.push('\nSus fortalezas y recursos internos:');         mem.fortalezas.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.vinculos.length)       { lines.push('\nPersonas clave en su vida:');                  mem.vinculos.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.acompanamiento.length) { lines.push('\nC\u00f3mo prefiere ser acompa\u00f1ada:');   mem.acompanamiento.forEach(function(t){lines.push('  - '+t);}); }
+
+  lines.push('\nCÓMO USAR ESTE PERFIL:');
+  lines.push('- Úsalo como lo haría un amigo que te conoce de verdad, no como una base de datos.');
+  lines.push('- Nunca digas "recuerdo que me dijiste..." ni hagas referencia explícita al perfil.');
+  lines.push('- Si alguien tiene miedo al abandono, no lo nombres — simplemente sé más presente y cálida.');
+  lines.push('- Si tiene una fortaleza, nómbrala cuando la persona dude de sí misma: "Pero tú sabes levantarte, lo has hecho antes."');
+  lines.push('- Si hay una herida, trátala con cuidado extremo. Nunca la uses para analizar a la persona.');
+  lines.push('- Si sabes su nombre, úsalo de vez en cuando. No en cada frase — solo cuando sienta natural.');
+  lines.push('- Este perfil es para que la sientas más cerca, no para que la expliques. Acompáñala, no la diagnostiques.');
+
+  return lines.join('\n');
+}
+
+async function extractAndSaveMemory() {
+  if (!chatHistory || chatHistory.length < 3) return;
+  if (!navigator.onLine) return;
+
+  var conversacion = chatHistory
+    .filter(function(m) { return m.text && m.text.length > 3; })
+    .map(function(m) { return (m.role === 'user' ? 'Persona: ' : 'Aura: ') + m.text; })
+    .join('\n')
+    .slice(0, 4000);
+
+  if (!conversacion.trim()) return;
+
+  var mem = loadUserMemory();
+  var perfilActual = JSON.stringify({
+    nombre:        mem.nombre,
+    miedos:        mem.miedos,
+    inseguridades: mem.inseguridades,
+    fortalezas:    mem.fortalezas,
+    vinculos:      mem.vinculos,
+    heridas:       mem.heridas,
+    acompanamiento:mem.acompanamiento
+  });
+
+  var prompt = [
+    'Eres un psicólogo clínico que construye un perfil emocional profundo y selectivo.',
+    'Tu criterio es estricto: solo registras lo que realmente importa para conocer a esta persona.',
+    '',
+    'PERFIL ACTUAL (lo que ya sabías antes de esta conversación):',
+    perfilActual,
+    '',
+    'CONVERSACIÓN DE HOY:',
+    conversacion,
+    '',
+    'Responde ÚNICAMENTE con JSON válido. Sin markdown ni texto adicional.',
+    'Si la conversación no revela nada nuevo y significativo, devuelve el perfil actual sin cambios.',
+    '',
+    'QUÉ SÍ MERECE RECORDARSE (ejemplos del tipo de cosas que buscas):',
+    '- Miedos: "Teme que si muestra vulnerabilidad la rechacen" / "Le aterra quedarse sola como su madre"',
+    '- Inseguridades: "Cree que no es suficientemente inteligente para lo que sueña" / "Siente que no merece ser amada"',
+    '- Fortalezas: "Tiene una capacidad notable para levantarse después de caer" / "Es profundamente empática con los demás"',
+    '- Heridas: "Creció sintiendo que sus emociones eran una carga para su familia" / "Una ruptura pasada la dejó con miedo a confiar"',
+    '- Vínculos: "Su relación con su madre es fuente de mucho dolor y amor al mismo tiempo" / "Tiene una amiga que es su único apoyo real"',
+    '- Acompañamiento: "Necesita sentirse escuchada antes de recibir cualquier consejo" / "Le molesta que le digan que sea fuerte"',
+    '',
+    'QUÉ NO MERECE RECORDARSE:',
+    '- Hechos del día: "tuvo un examen", "discutió con alguien en el trabajo"',
+    '- Datos superficiales: "le gusta el café", "estudia medicina"',
+    '- Cosas que mencionó de pasada sin peso emocional',
+    '- Nada que no te ayude a acompañarla mejor en el largo plazo',
+    '',
+    'REGLAS DE ACTUALIZACIÓN:',
+    '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías a menos que la persona lo contradiga.',
+    '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo.',
+    '- Máximo 5 items por campo. Si ya hay 5 y encuentras algo más importante, reemplaza el menos relevante.',
+    '- Cada item: máximo 20 palabras, en español, en tercera persona, específico y humano.',
+    '- Si no sabes el nombre con certeza, deja null.',
+    '',
+    'Formato exacto:',
+    '{ "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [] }'
+  ].join('\n');
+
+  try {
+    var res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 600
+      })
+    });
+    if (!res.ok) return;
+
+    var data = await res.json();
+    var raw  = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (!raw) return;
+
+    var clean    = raw.replace(/```json|```/g, '').trim();
+    var extraido = JSON.parse(clean);
+    if (!extraido || typeof extraido !== 'object') return;
+
+    if (extraido.nombre)                                              mem.nombre        = extraido.nombre.trim();
+    if (Array.isArray(extraido.miedos)         && extraido.miedos.length)         mem.miedos        = extraido.miedos;
+    if (Array.isArray(extraido.inseguridades)  && extraido.inseguridades.length)  mem.inseguridades = extraido.inseguridades;
+    if (Array.isArray(extraido.fortalezas)     && extraido.fortalezas.length)     mem.fortalezas    = extraido.fortalezas;
+    if (Array.isArray(extraido.vinculos)       && extraido.vinculos.length)       mem.vinculos      = extraido.vinculos;
+    if (Array.isArray(extraido.heridas)        && extraido.heridas.length)        mem.heridas       = extraido.heridas;
+    if (Array.isArray(extraido.acompanamiento) && extraido.acompanamiento.length) mem.acompanamiento= extraido.acompanamiento;
+
+    mem.sesiones  = (mem.sesiones || 0) + 1;
+    mem.updatedAt = new Date().toISOString();
+    saveUserMemory(mem);
+
+  } catch(e) { /* fire-and-forget */ }
+}
 
 let chatHistory = [];
 let pendingFiles = [];
@@ -5046,7 +5589,6 @@ function openChat() {
   } else {
     document.getElementById('chat-badge').textContent = currentProfile === 'joven' ? 'Joven' : 'Adulto';
   }
-  history.pushState({ screen: 's-chat' }, '');
   window.scrollTo(0, 0);
 
   // Only load/init if messages area is empty (avoid duplication on re-open)
@@ -5101,6 +5643,7 @@ function nuevaConversacion() {
 
 function limpiarYReiniciar() {
   stopTTS();
+  extractAndSaveMemory(); // guardar memoria antes de limpiar el historial
   clearChatSession();
   const container = document.getElementById('chat-messages');
   container.innerHTML = '';
@@ -5129,6 +5672,7 @@ function closeExitModal() {
 
 function confirmExit() {
   document.getElementById('exit-modal').style.display = 'none';
+  extractAndSaveMemory(); // silencioso — aprende antes de salir
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   if (currentProfile === 'padre') {
     document.getElementById('s-padres').classList.add('active');
@@ -5141,13 +5685,15 @@ function confirmExit() {
 function initChat() {
   chatHistory = [];
   let greeting = '';
-  if (currentProfile === 'padre') {
-    greeting = 'Hola 👋 Soy Aura. Entiendo lo difícil que puede ser ver a un hijo/a pasar por un mal momento. Estoy aquí para orientarte con información y sugerencias desde la perspectiva de padres. Cuéntame, ¿qué está sucediendo o qué te preocupa?';
-  } else if (currentProfile === 'joven') {
-    greeting = 'Hola 👋 Soy Aura, tu asistente de apoyo. Estoy aquí para escucharte sin juzgarte. ¿Cómo estás hoy? Puedes contarme lo que quieras, o compartir una imagen si lo prefieres.';
+
+  if (currentProfile === 'joven') {
+    greeting = 'Hola 👋 Soy Aura. Estoy aquí para escucharte — sin juicios, sin carreras, sin que tengas que explicar nada que no quieras.\n\n¿Cómo estás hoy? Puedes contarme lo que quieras, o compartir una imagen si lo prefieres.';
+  } else if (currentProfile === 'padre') {
+    greeting = 'Hola 👋 Soy Aura. Sé que acompañar a un hijo o hija cuando está mal puede ser de las cosas más difíciles — no siempre sabes qué decir, y el miedo a equivocarte puede ser enorme.\n\nAquí puedes hablar con libertad. ¿Qué está pasando?';
   } else {
-    greeting = 'Hola 👋 Soy Aura. Este es un espacio seguro para ti. ¿Cómo te has sentido últimamente? Cuéntame lo que traigas — aquí no hay respuestas incorrectas.';
+    greeting = 'Hola 👋 Soy Aura, tu asistente de apoyo. Estoy aquí para escucharte sin juzgarte. ¿Cómo estás hoy? Puedes contarme lo que quieras, o compartir una imagen si lo prefieres.';
   }
+
   appendMessage('ai', greeting);
 }
 
@@ -5542,13 +6088,15 @@ async function sendMessage() {
 
   // El system prompt lo inyecta el Worker server-side;
   // aquí solo enviamos el historial de usuario/asistente.
-  const groqMessages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  const groqMessages = [{ role: 'system', content: getSystemPrompt() }];
+
+  // Inyectar memoria persistente del usuario (lo que Aura ha aprendido de él/ella)
+  const memCtx = buildMemoryContext();
+  if (memCtx) groqMessages.push({ role: 'system', content: memCtx });
 
   // Inject mood history context as a second system message if available
   const moodCtx = buildMoodContext();
-  if (moodCtx) {
-    groqMessages.push({ role: 'system', content: moodCtx });
-  }
+  if (moodCtx) groqMessages.push({ role: 'system', content: moodCtx });
 
   chatHistory.forEach(function(m) {
     groqMessages.push({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text });
@@ -5575,6 +6123,7 @@ async function sendMessage() {
       chatHistory.push({ role: 'ai', text: result.text });
       if (chatHistory.length > CHAT_MAX_MESSAGES) chatHistory = chatHistory.slice(-CHAT_MAX_MESSAGES);
       appendMessage('ai', result.text);
+      inferMoodFromChat(text); // inferencia silenciosa en segundo plano
     } else {
       const fallback = 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.';
       chatHistory.push({ role: 'ai', text: fallback });
@@ -6017,6 +6566,13 @@ window.addEventListener('beforeinstallprompt', function(e) {
 });
 
 // ── Al cargar la página ───────────────────────────────────────
+// Guardar memoria si el usuario cierra la app sin pasar por el modal de salida
+window.addEventListener('beforeunload', function() {
+  if (chatHistory && chatHistory.length >= 3) {
+    extractAndSaveMemory();
+  }
+});
+
 window.addEventListener('load', function() {
   var plat        = _getPlatform();
   var isInstalled = window.matchMedia('(display-mode: standalone)').matches;
@@ -6112,69 +6668,6 @@ function _hideDesktopInstallBtn() {
   if (btn) btn.remove();
   sessionStorage.setItem('pwa-install-dismissed', '1');
 }
-
-// ══════════════════════════════════════════════
-// MANEJO DEL BOTÓN "ATRÁS" DEL SISTEMA OPERATIVO
-// ──────────────────────────────────────────────
-// La app usa pantallas CSS (display:none/flex), no URLs distintas.
-// Sin este código, el botón "atrás" del celular cierra la app porque
-// no hay nada en el historial del navegador que interceptar.
-//
-// Solución: cada función de navegación ya llama history.pushState()
-// con el nombre de la pantalla activa. El listener "popstate" intercepta
-// el gesto "atrás" y navega internamente en lugar de salir.
-// ══════════════════════════════════════════════
-
-// Estado inicial: reemplazamos el estado vacío con 's-landing'.
-(function() {
-  history.replaceState({ screen: 's-landing' }, '');
-})();
-
-window.addEventListener('popstate', function(event) {
-  if (!event.state || !event.state.screen) return;
-
-  var screen = event.state.screen;
-
-  // ── Cerrar overlays/modales primero ──────────────────────────
-  var crisisOverlay = document.getElementById('crisis-overlay');
-  if (crisisOverlay && crisisOverlay.classList.contains('active')) {
-    closeCrisisMode();
-    history.pushState(event.state, '');
-    return;
-  }
-
-  var exitModal = document.getElementById('exit-modal');
-  if (exitModal && exitModal.style.display === 'flex') {
-    closeExitModal();
-    history.pushState(event.state, '');
-    return;
-  }
-
-  var saveModal = document.getElementById('save-consent-modal');
-  if (saveModal && saveModal.classList.contains('open')) {
-    closeSaveConsentModal();
-    history.pushState(event.state, '');
-    return;
-  }
-
-  // ── Navegar según pantalla destino ────────────────────────────
-  if (screen === 's-chat') {
-    // Estaba en el chat → abrir modal de salida
-    history.pushState({ screen: 's-chat' }, '');
-    goBackFromChat();
-    return;
-  }
-
-  if (screen === 's-professional' || screen === 's-pro-access' ||
-      screen === 's-personal'     || screen === 's-padres') {
-    // Cualquiera de estas → volver a landing
-    document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
-    document.getElementById('s-landing').classList.add('active');
-    window.scrollTo(0, 0);
-    return;
-  }
-  // s-landing: el navegador puede salir normalmente (no hacemos nada).
-});
 
 // ── Banner Android (flotante, parte inferior) ─────────────────
 function showInstallBanner() {
