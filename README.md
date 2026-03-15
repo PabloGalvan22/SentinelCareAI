@@ -1,7 +1,9 @@
 # SentinelCareAI — Contigo Siempre
 
 > Apoyo emocional con inteligencia artificial, detección de riesgo y acompañamiento personalizado. Todo local, todo privado.
+> 
 > Plataforma PWA de apoyo emocional y detección de riesgo con inteligencia artificial.
+> 
 > Diseñada para el contexto hispanohablante mexicano.
 
 
