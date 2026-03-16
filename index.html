@@ -6795,16 +6795,16 @@ function hideInstallBanner() {
 //   crisis overlay o modal abierto → se cierra primero
 // ══════════════════════════════════════════════
 
-
 // Estado inicial: la landing ya está activa al cargar.
+// replaceState registra ese estado base para que popstate siempre tenga algo que leer.
 (function() {
   history.replaceState({ screen: 's-landing' }, '');
 })();
 
 window.addEventListener('popstate', function(event) {
-  var targetScreen = event.state && event.state.screen;
+  var screen = event.state && event.state.screen;
 
-  // ── 1. Cerrar overlays/modales primero ─────────────────────────
+  // ── 1. Cerrar overlays/modales primero (prioridad máxima) ──────
   var crisisOverlay = document.getElementById('crisis-overlay');
   if (crisisOverlay && crisisOverlay.classList.contains('active')) {
     closeCrisisMode();
@@ -6815,34 +6815,33 @@ window.addEventListener('popstate', function(event) {
   var exitModal = document.getElementById('exit-modal');
   if (exitModal && exitModal.style.display === 'flex') {
     closeExitModal();
-    history.pushState({ screen: 's-chat' }, '');
+    history.pushState(event.state || { screen: 's-chat' }, '');
     return;
   }
 
   var saveModal = document.getElementById('save-consent-modal');
   if (saveModal && saveModal.classList.contains('open')) {
     closeSaveConsentModal();
-    history.pushState({ screen: 's-chat' }, '');
+    history.pushState(event.state || { screen: 's-chat' }, '');
     return;
   }
 
-  // ── 2. Detectar qué pantalla está activa AHORA ─────────────────
-  // (antes de que el historial cambie la vista)
-  var chatScreen = document.getElementById('s-chat');
-  var chatActivo = chatScreen && chatScreen.classList.contains('active');
+  // ── 2. Mostrar la pantalla que indica el estado del historial ──
+  // El navegador ya retrocedió un paso — solo mostramos esa pantalla.
+  if (!screen) return;
 
-  // Si el chat está activo → interceptar y mostrar modal de salida
-  // El historial ya retrocedió, así que reempujamos s-chat para mantenerlo
-  if (chatActivo) {
+  // Si estamos "regresando" al chat desde algún otro lado (no debería
+  // pasar normalmente, pero por si acaso), abrimos el modal de salida.
+  if (screen === 's-chat') {
     history.pushState({ screen: 's-chat' }, '');
     goBackFromChat();
     return;
   }
 
-  // ── 3. Para cualquier otra pantalla: mostrar el destino ────────
-  if (!targetScreen) return;
-
-  var target = document.getElementById(targetScreen);
+  // Para cualquier otra pantalla: simplemente mostrarla.
+  // Esto cubre: s-personal → s-landing, s-padres → s-landing,
+  // s-professional → s-personal/padres, s-chat → s-personal/padres, etc.
+  var target = document.getElementById(screen);
   if (target) {
     document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
     target.classList.add('active');
