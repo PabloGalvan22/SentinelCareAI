@@ -55,27 +55,45 @@ SentinelCareAI/
 
 ---
 
+## Navegación con botón "atrás" del sistema operativo
+
+Implementado con `history.pushState` en cada transición y `window.addEventListener('popstate', ...)` para interceptar el gesto nativo del celular. Se comporta como una app nativa.
+
+| Dónde estás | Qué hace el botón atrás |
+|-------------|------------------------|
+| Chat | Va a la pantalla personal o padres (según perfil) |
+| Personal / Padres | Va a la landing (selección de perfil) |
+| Pro-Access / Profesional | Va a la landing |
+| Landing | Sale de la app |
+| Crisis overlay o modal abierto | Lo cierra primero |
+
+Al retroceder desde el chat con el botón del sistema, Aura guarda la memoria silenciosamente antes de salir.
+
+---
+
 ## Perfiles de usuario
+
+Cada perfil tiene su propio **prompt de sistema** (`getSystemPrompt()`) y su propio **primer mensaje** (`initChat()`), completamente diferenciados.
 
 ### 👤 Joven
 - Tono espontáneo e informal, como un hermano mayor de confianza
-- Valida emociones sin minimizarlas
+- Valida emociones sin minimizarlas ni decir "a tu edad es normal"
 - Entiende presión académica, redes sociales, identidad, relaciones
-- Primer mensaje: empático y sin protocolos
+- Primer mensaje: *"Hola 👋 Soy Aura. Estoy aquí para escucharte — sin juicios, sin carreras..."*
 
 ### 👤 Adulto
 - Tono sereno y reflexivo, sin condescendencia
 - Reconoce el peso de las responsabilidades
 - Entiende duelo, relaciones de pareja, pérdida de rumbo, agotamiento
 - No infantiliza, confía en la madurez de la persona
+- Primer mensaje: *"Hola 👋 Soy Aura, tu asistente de apoyo. Estoy aquí para escucharte sin juzgarte..."*
 
 ### 👤 Padre / Madre
 - Valida primero el miedo y el amor detrás de la preocupación
 - Orienta sin culpar
 - Detecta señales de alerta en los hijos y orienta hacia recursos
 - Recuerda que el padre también necesita ser escuchado
-
-Cada perfil tiene su propio **prompt de sistema** (`getSystemPrompt()`) y su propio **primer mensaje** (`initChat()`), completamente diferenciados.
+- Primer mensaje: *"Hola 👋 Soy Aura. Sé que acompañar a un hijo cuando está mal puede ser de las cosas más difíciles..."*
 
 ---
 
@@ -83,11 +101,11 @@ Cada perfil tiene su propio **prompt de sistema** (`getSystemPrompt()`) y su pro
 
 ### Motor
 - **Modelo principal:** `llama-3.3-70b-versatile` vía Groq
-- **Modelo de inferencia ligera:** `llama-3.1-8b-instant` (tareas rápidas en segundo plano)
+- **Modelo de inferencia ligera:** `llama-3.1-8b-instant` (tareas en segundo plano)
 - **Transcripción de voz:** Whisper `whisper-large-v3-turbo`
 
 ### Capacidades del chat
-- Respuestas empáticas adaptadas al perfil activo
+- Respuestas empáticas adaptadas al perfil activo (joven / adulto / padre)
 - Soporte para texto, imágenes y archivos adjuntos
 - Entrada por voz (STT con Groq Whisper)
 - Lectura en voz alta de respuestas (TTS con Web Speech API)
@@ -96,6 +114,13 @@ Cada perfil tiene su propio **prompt de sistema** (`getSystemPrompt()`) y su pro
 - Contador de caracteres (límite 2,000)
 - Indicador de escritura animado
 - Reintento automático ante errores de red (hasta 3 intentos)
+
+### Editar el último mensaje
+El usuario puede editar su último mensaje enviado tocando el botón ✏️ que aparece sobre él. Al tocarlo:
+- Se borra del chat ese mensaje y la respuesta de Aura que vino después
+- El texto vuelve al input para que el usuario lo corrija
+- Al reenviar, Aura responde como si el mensaje anterior no hubiera existido
+- El botón ✏️ siempre está solo en el último mensaje del usuario — nunca en los anteriores
 
 ### Exportación
 - Exportar conversación como **PDF** con formato visual completo (jsPDF)
@@ -163,7 +188,7 @@ Gráfica de línea que muestra el estado emocional de los últimos 7 días.
 ### Diferenciación visual en la gráfica
 - 🟢 **Punto verde sólido** = registrado manualmente por el usuario
 - ⭕ **Punto hueco teal** = detectado automáticamente del chat
-- Tooltip muestra la fuente al tocar cada punto
+- Tooltip muestra la fuente al tocar cada punto (`· manual` / `· del chat`)
 - Leyenda aparece automáticamente cuando hay datos inferidos
 
 ### Badge de estado
@@ -250,7 +275,7 @@ Si el dispositivo pierde conexión, el Service Worker sirve `offline.html` con:
 - **CORS** — lista blanca de orígenes autorizados
 - **Allowlist de modelos** — solo modelos aprobados pueden usarse
 - **Límites de parámetros** — `temperature` (0–1.5), `max_tokens` (1–2,000)
-- **Filtro de system prompt** — el worker elimina cualquier `role: system` que venga del cliente e inyecta el prompt autoritativo del servidor
+- **Filtro de system prompt** — el worker elimina cualquier `role: system` del cliente e inyecta el prompt autoritativo del servidor
 - **Rate limiting en memoria:**
   - Máx. 30 requests / minuto por IP
   - Máx. 500 requests / día por IP
@@ -294,19 +319,6 @@ wrangler deploy
 
 ---
 
-## Navegación con botón "atrás" del sistema operativo
-
-Implementado con `history.pushState` en cada transición de pantalla y `window.addEventListener('popstate', ...)` para interceptar el gesto nativo del celular.
-
-| Pantalla actual | Comportamiento del "atrás" |
-|-----------------|---------------------------|
-| Chat | Abre el modal "Antes de irte…" |
-| Personal / Padres / Pro-Access / Profesional | Regresa a la landing |
-| Landing | El navegador sale normalmente |
-| Crisis overlay o modales abiertos | Los cierra primero |
-
----
-
 ## Modo oscuro
 
 - Toggle disponible en todas las pantallas con header
@@ -339,11 +351,11 @@ Implementado con `history.pushState` en cada transición de pantalla y `window.a
 
 | Clave | Contenido | Cuándo se borra |
 |-------|-----------|-----------------|
-| `sentinelUserMemory` | Perfil emocional de Aura | Botón "Borrar memoria" |
-| `sentinelMoodHistory` | Historial de bienestar | Manual (no hay botón de borrado aún) |
+| `sentinelUserMemory` | Perfil emocional de Aura (9 categorías) | Botón "Borrar memoria" |
+| `sentinelMoodHistory` | Historial de bienestar emocional | Manual |
 | `sentinelChatSession` | Última conversación guardada | "Nueva conversación" o modal de salida |
-| `sentinelDark` | Preferencia de modo oscuro | Nunca (preferencia permanente) |
-| `sentinelNotes` | Notas clínicas (profesional) | Botón "Borrar registros" |
+| `sentinelDark` | Preferencia de modo oscuro | Nunca |
+| `sentinelNotes` | Notas clínicas (profesional de salud) | Botón "Borrar registros" |
 | `sentinelStudentNotes` | Notas de alumnos (educador) | Manual |
 
 ---
@@ -352,18 +364,16 @@ Implementado con `history.pushState` en cada transición de pantalla y `window.a
 
 ```js
 // index.html
-const PROXY_BASE_URL   = 'https://sentinel-proxy.sentinelpablo.workers.dev';
-const GROQ_MODEL       = 'llama-3.3-70b-versatile';
-const WHISPER_MODEL    = 'whisper-large-v3-turbo';
-const CHAT_MAX_DAYS    = 7;    // días antes de expirar sesión guardada
-const CHAT_MAX_MESSAGES = 30;  // mensajes máximos en historial guardado
-
-// Memoria de Aura
-const MEMORY_KEY       = 'sentinelUserMemory';
+const PROXY_BASE_URL    = 'https://sentinel-proxy.sentinelpablo.workers.dev';
+const GROQ_MODEL        = 'llama-3.3-70b-versatile';
+const WHISPER_MODEL     = 'whisper-large-v3-turbo';
+const CHAT_MAX_DAYS     = 7;    // días antes de expirar sesión guardada
+const CHAT_MAX_MESSAGES = 30;   // mensajes máximos en historial guardado
+const MEMORY_KEY        = 'sentinelUserMemory';
 
 // worker.js
-const RL_MAX_MINUTE    = 30;   // requests por minuto por IP
-const RL_MAX_DAY       = 500;  // requests por día por IP
+const RL_MAX_MINUTE     = 30;   // requests por minuto por IP
+const RL_MAX_DAY        = 500;  // requests por día por IP
 ```
 
 ---
