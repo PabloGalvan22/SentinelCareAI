@@ -5704,14 +5704,14 @@ function closeExitModal() {
 
 function confirmExit() {
   document.getElementById('exit-modal').style.display = 'none';
-  extractAndSaveMemory(); // silencioso — aprende antes de salir
+  extractAndSaveMemory();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   if (currentProfile === 'padre') {
     document.getElementById('s-padres').classList.add('active');
-    history.pushState({ screen: 's-padres' }, '');
   } else {
     document.getElementById('s-personal').classList.add('active');
-    history.pushState({ screen: 's-personal' }, '');
+    setTimeout(updateMoodChart, 100);
+    setTimeout(renderMemoryPreview, 150);
   }
   window.scrollTo(0, 0);
 }
@@ -6796,15 +6796,14 @@ function hideInstallBanner() {
 // ══════════════════════════════════════════════
 
 // Estado inicial: la landing ya está activa al cargar.
-// replaceState registra ese estado base para que popstate siempre tenga algo que leer.
 (function() {
   history.replaceState({ screen: 's-landing' }, '');
 })();
 
 window.addEventListener('popstate', function(event) {
-  var screen = event.state && event.state.screen;
+  var targetScreen = event.state && event.state.screen;
 
-  // ── 1. Cerrar overlays/modales primero (prioridad máxima) ──────
+  // ── 1. Cerrar overlays/modales primero ─────────────────────────
   var crisisOverlay = document.getElementById('crisis-overlay');
   if (crisisOverlay && crisisOverlay.classList.contains('active')) {
     closeCrisisMode();
@@ -6815,36 +6814,47 @@ window.addEventListener('popstate', function(event) {
   var exitModal = document.getElementById('exit-modal');
   if (exitModal && exitModal.style.display === 'flex') {
     closeExitModal();
-    history.pushState(event.state || { screen: 's-chat' }, '');
+    history.pushState({ screen: 's-chat' }, '');
     return;
   }
 
   var saveModal = document.getElementById('save-consent-modal');
   if (saveModal && saveModal.classList.contains('open')) {
     closeSaveConsentModal();
-    history.pushState(event.state || { screen: 's-chat' }, '');
-    return;
-  }
-
-  // ── 2. Mostrar la pantalla que indica el estado del historial ──
-  // El navegador ya retrocedió un paso — solo mostramos esa pantalla.
-  if (!screen) return;
-
-  // Si estamos "regresando" al chat desde algún otro lado (no debería
-  // pasar normalmente, pero por si acaso), abrimos el modal de salida.
-  if (screen === 's-chat') {
     history.pushState({ screen: 's-chat' }, '');
-    goBackFromChat();
     return;
   }
 
-  // Para cualquier otra pantalla: simplemente mostrarla.
-  // Esto cubre: s-personal → s-landing, s-padres → s-landing,
-  // s-professional → s-personal/padres, s-chat → s-personal/padres, etc.
-  var target = document.getElementById(screen);
+  // ── 2. Sin destino válido → dejar salir al navegador ───────────
+  if (!targetScreen) return;
+
+  // ── 3. Mostrar la pantalla que el historial indica ─────────────
+  // El navegador ya retrocedió un paso en la pila.
+  // Solo mostramos la pantalla correspondiente — sin modal, sin redirección.
+  //
+  // Pila real:
+  //   s-landing → s-personal → s-chat
+  //   s-landing → s-padres   → s-chat
+  //
+  // Atrás desde s-chat     → event.state = s-personal/s-padres → se muestra
+  // Atrás desde s-personal → event.state = s-landing           → se muestra
+  // Atrás desde s-landing  → no hay estado → navegador sale
+
+  // Si el chat estaba activo, guardar memoria antes de salir de él
+  var chatScreen = document.getElementById('s-chat');
+  if (chatScreen && chatScreen.classList.contains('active')) {
+    stopTTS();
+    extractAndSaveMemory(); // silencioso
+  }
+
+  var target = document.getElementById(targetScreen);
   if (target) {
     document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
     target.classList.add('active');
+    if (targetScreen === 's-personal') {
+      setTimeout(updateMoodChart, 100);
+      setTimeout(renderMemoryPreview, 150);
+    }
     window.scrollTo(0, 0);
   }
 });
