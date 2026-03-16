@@ -1789,6 +1789,32 @@ body.dark-mode .btn-save-session { border-color: rgba(107,143,113,0.35); }
 }
 .msg.user .msg-bubble a { color: #d4f0ff; }
 
+/* ─── EDITAR MENSAJE ──────────────────────────── */
+.msg-edit-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.85);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  margin-left: 6px;
+  align-self: flex-end;
+  margin-bottom: 4px;
+}
+.msg-edit-btn:hover {
+  background: rgba(255,255,255,0.28);
+  border-color: rgba(255,255,255,0.6);
+  color: white;
+}
+.msg.user.editable .msg-edit-btn { display: flex; }
+.msg.user { display: flex; flex-direction: row-reverse; align-items: flex-end; gap: 0; }
+
 .char-counter {
   font-size: 0.72rem;
   color: var(--text-light);
@@ -5794,9 +5820,12 @@ function appendMessage(role, text, fileInfo) {
     : text.replace(/\n/g, '<br>');
   div.innerHTML = '<div class="msg-avatar"><i class="' + avatarIcon + '"></i></div>'
     + '<div class="msg-bubble">' + fileHtml + renderedText + crisisHtml
-    + '<span class="msg-time">' + timeStr + '</span></div>';
+    + '<span class="msg-time">' + timeStr + '</span></div>'
+    + (role === 'user' ? '<button class="msg-edit-btn" title="Editar mensaje" onclick="editLastMessage(this)"><i class="fas fa-pen"></i></button>' : '');
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
+
+  if (role === 'user') updateEditButtons();
 
   // Speak AI responses if TTS is enabled
   if (role === 'ai') speakText(text);
@@ -5811,6 +5840,66 @@ function appendMessage(role, text, fileInfo) {
     // Mostrar el botón Guardar en cuanto hay mensajes suficientes
     updateSaveButton();
   }
+}
+
+// ── Mantiene el botón de editar solo en el último mensaje del usuario ──
+function updateEditButtons() {
+  const container = document.getElementById('chat-messages');
+  // Quitar clase 'editable' de todos los mensajes de usuario
+  container.querySelectorAll('.msg.user').forEach(function(m) {
+    m.classList.remove('editable');
+  });
+  // Ponerla solo en el último mensaje de usuario
+  const userMsgs = container.querySelectorAll('.msg.user');
+  if (userMsgs.length > 0) {
+    userMsgs[userMsgs.length - 1].classList.add('editable');
+  }
+}
+
+// ── Editar el último mensaje enviado ──────────────────────────────
+// Borra el último mensaje del usuario Y la última respuesta de Aura
+// del DOM y del chatHistory, y pone el texto en el input para corregirlo.
+function editLastMessage(btn) {
+  const container = document.getElementById('chat-messages');
+  const input     = document.getElementById('chat-input');
+
+  // Encontrar el mensaje de usuario que contiene este botón
+  const msgDiv = btn.closest('.msg.user');
+  if (!msgDiv) return;
+
+  // Recuperar el texto original del chatHistory (más fiable que el DOM)
+  // El último entry de 'user' en chatHistory
+  let userIdx = -1;
+  for (let i = chatHistory.length - 1; i >= 0; i--) {
+    if (chatHistory[i].role === 'user') { userIdx = i; break; }
+  }
+  if (userIdx === -1) return;
+
+  const originalText = chatHistory[userIdx].text;
+
+  // Borrar del DOM: el mensaje de usuario y todas las respuestas de Aura
+  // que vinieron después (normalmente solo una, pero por si acaso)
+  const allMsgs = Array.from(container.children);
+  const msgIdx  = allMsgs.indexOf(msgDiv);
+  // Borrar desde el mensaje del usuario hacia adelante
+  for (let i = allMsgs.length - 1; i >= msgIdx; i--) {
+    allMsgs[i].remove();
+  }
+
+  // Borrar del chatHistory desde ese índice hacia adelante
+  chatHistory.splice(userIdx);
+
+  // Poner el texto en el input
+  input.value = originalText === '[archivo adjunto]' ? '' : originalText;
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  input.focus();
+
+  // Actualizar botones de editar
+  updateEditButtons();
+
+  // Habilitar botón de envío por si estaba deshabilitado
+  document.getElementById('chat-send-btn').disabled = false;
 }
 
 function appendTyping() {
@@ -6158,6 +6247,7 @@ async function sendMessage() {
       if (chatHistory.length > CHAT_MAX_MESSAGES) chatHistory = chatHistory.slice(-CHAT_MAX_MESSAGES);
       appendMessage('ai', result.text);
       inferMoodFromChat(text); // inferencia silenciosa en segundo plano
+      updateEditButtons();     // mantener botón editar en el último msg del usuario
     } else {
       const fallback = 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.';
       chatHistory.push({ role: 'ai', text: fallback });
