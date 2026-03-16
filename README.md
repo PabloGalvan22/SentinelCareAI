@@ -121,14 +121,17 @@ Aura aprende de cada persona a lo largo del tiempo. Todo se guarda **únicamente
 
 ### Qué guarda (solo lo que realmente importa)
 
-| Categoría | Ejemplos |
-|-----------|---------|
-| `miedos` | "Teme que si muestra vulnerabilidad la rechacen" |
-| `inseguridades` | "Cree que no es suficientemente inteligente para lo que sueña" |
-| `fortalezas` | "Tiene una capacidad notable para levantarse después de caer" |
-| `heridas` | "Creció sintiendo que sus emociones eran una carga para su familia" |
-| `vinculos` | "Su relación con su madre es fuente de dolor y amor al mismo tiempo" |
-| `acompanamiento` | "Necesita sentirse escuchada antes de recibir cualquier consejo" |
+| # | Categoría | Ícono | Ejemplo |
+|---|-----------|-------|---------|
+| 1 | `miedos` | 🛡️ | "Teme que si muestra vulnerabilidad la rechacen" |
+| 2 | `inseguridades` | 🌧️ | "Cree que no es suficientemente inteligente para lo que sueña" |
+| 3 | `heridas` | 💔 | "Creció sintiendo que sus emociones eran una carga para su familia" |
+| 4 | `triggers` | ⚡ | "Se desestabiliza cuando alguien la ignora o no le responde" |
+| 5 | `fortalezas` | 🌱 | "Tiene una capacidad notable para levantarse después de caer" |
+| 6 | `valores` | 🧭 | "La honestidad y la lealtad son lo más importante para ella" |
+| 7 | `suenos` | ⭐ | "Quiere estudiar psicología para ayudar a otros como ella" |
+| 8 | `vinculos` | 👥 | "Su relación con su madre es fuente de dolor y amor al mismo tiempo" |
+| 9 | `acompanamiento` | 👂 | "Necesita sentirse escuchada antes de recibir cualquier consejo" |
 
 ### Qué NO guarda
 - Hechos del día sin peso emocional ("tuvo un examen", "fue al gimnasio")
@@ -136,9 +139,9 @@ Aura aprende de cada persona a lo largo del tiempo. Todo se guarda **únicamente
 - Nada que no ayude a acompañar mejor en el largo plazo
 
 ### Límites
-- Máximo **5 items por categoría** (solo los más significativos)
-- Los datos más viejos se reemplazan si hay algo más relevante
-- Sin fecha de expiración fija — el perfil crece con la persona
+- **9 categorías × 8 items = 72 datos máximos** en el perfil
+- Los datos menos relevantes se reemplazan cuando una categoría está llena
+- Sin fecha de expiración fija — el perfil crece y se refina con la persona
 
 ### Control del usuario
 - Tarjeta visual "Lo que Aura recuerda de ti" en la pantalla personal
