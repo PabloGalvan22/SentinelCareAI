@@ -543,6 +543,26 @@ body {
 .wellness-empty i { font-size: 2.5rem; margin-bottom: 12px; color: var(--teal-light); }
 .wellness-empty p { font-size: 0.9rem; }
 
+/* ─── SELECTOR DE RANGO DE GRÁFICA ───────────── */
+.mood-range-btn {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-mid);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+}
+.mood-range-btn:hover { border-color: var(--teal); color: var(--teal); }
+.mood-range-btn.active-range {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: white;
+}
+
 /* ─── SCREEN 5: PADRES DE FAMILIA ─────────────── */
 #s-padres {
   background: linear-gradient(135deg, #f5f0fa 0%, #ede7f5 100%);
@@ -3378,6 +3398,9 @@ let studentNotes = loadStudentNotes();
 // ── BIENESTAR ─────────────────────────────────────────────
 let moodHistory = []; // array de objetos { date: 'YYYY-MM-DD', value: 1..5 }
 
+// ── Rango visible de la gráfica: fijo en 15 días ─────────────────
+var moodDaysRange = 15;
+
 // Cargar historial desde localStorage al iniciar
 (function loadMoodHistory() {
   const stored = localStorage.getItem('sentinelMoodHistory');
@@ -3389,6 +3412,13 @@ let moodHistory = []; // array de objetos { date: 'YYYY-MM-DD', value: 1..5 }
 })();
 
 function saveMoodHistory() {
+  // Eliminar clave de preferencia de rango (ya no se usa — fijo en 30 días)
+  localStorage.removeItem('sentinelMoodRange');
+  // Aplicar límite de 180 días antes de guardar
+  var limite = new Date();
+  limite.setDate(limite.getDate() - 180);
+  var limiteStr = limite.toISOString().split('T')[0];
+  moodHistory = moodHistory.filter(function(e) { return e.date >= limiteStr; });
   localStorage.setItem('sentinelMoodHistory', JSON.stringify(moodHistory));
 }
 
@@ -3502,18 +3532,18 @@ function updateMoodChart() {
   canvas.style.display = 'block';
   emptyMsg.style.display = 'none';
 
-  var last7  = moodHistory.slice(-7);
-  var labels = last7.map(function(e) {
+  var lastN  = moodHistory.slice(-moodDaysRange);
+  var labels = lastN.map(function(e) {
     var parts = e.date.split('-');
     return parts[2] + '/' + parts[1];
   });
-  var data = last7.map(function(e) { return e.value; });
+  var data = lastN.map(function(e) { return e.value; });
 
   // Puntos: verde sólido = manual · hueco teal = inferido del chat
-  var pointBg      = last7.map(function(e) { return e.inferredFromChat ? 'rgba(61,122,138,0.12)' : '#6b8f71'; });
-  var pointBorder  = last7.map(function(e) { return e.inferredFromChat ? '#3d7a8a' : '#fff'; });
-  var pointRadius  = last7.map(function(e) { return e.inferredFromChat ? 7 : 5; });
-  var pointBorderW = last7.map(function(e) { return e.inferredFromChat ? 2.5 : 2; });
+  var pointBg      = lastN.map(function(e) { return e.inferredFromChat ? 'rgba(61,122,138,0.12)' : '#6b8f71'; });
+  var pointBorder  = lastN.map(function(e) { return e.inferredFromChat ? '#3d7a8a' : '#fff'; });
+  var pointRadius  = lastN.map(function(e) { return e.inferredFromChat ? 7 : 5; });
+  var pointBorderW = lastN.map(function(e) { return e.inferredFromChat ? 2.5 : 2; });
 
   var ctx = canvas.getContext('2d');
   if (window.moodChartInstance) window.moodChartInstance.destroy();
@@ -3563,7 +3593,7 @@ function updateMoodChart() {
           callbacks: {
             label: function(ctx) {
               var val    = ctx.raw;
-              var entry  = last7[ctx.dataIndex];
+              var entry  = lastN[ctx.dataIndex];
               var mood   = ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'][val] || '';
               var source = (entry && entry.inferredFromChat) ? ' · del chat' : ' · manual';
               return mood + source;
@@ -3575,7 +3605,7 @@ function updateMoodChart() {
   });
 
   // Leyenda pequeña debajo (solo cuando hay datos inferidos)
-  var hasInferred = last7.some(function(e) { return e.inferredFromChat; });
+  var hasInferred = lastN.some(function(e) { return e.inferredFromChat; });
   var legend = document.getElementById('mood-chart-legend');
   if (hasInferred) {
     if (!legend) {
