@@ -4040,6 +4040,7 @@ function _doLaunchProfessional(profile) {
     }
   }
   switchProTab('analisys');
+  history.pushState({ screen: 's-professional' }, '');
   window.scrollTo(0, 0);
 }
 
@@ -4060,10 +4061,13 @@ function enterApp(profile) {
       greeting.textContent = 'Hola — estamos aquí contigo';
     }
     setTimeout(updateMoodChart, 100);
+    setTimeout(renderMemoryPreview, 150);
+    history.pushState({ screen: 's-personal' }, '');
     window.scrollTo(0, 0);
   }
   else if (profile === 'padre') {
     document.getElementById('s-padres').classList.add('active');
+    history.pushState({ screen: 's-padres' }, '');
     window.scrollTo(0, 0);
   }
   else {
@@ -4072,6 +4076,7 @@ function enterApp(profile) {
     document.getElementById('pro-access-input').value = '';
     document.getElementById('pro-access-error').classList.remove('show');
     document.getElementById('s-pro-access').classList.add('active');
+    history.pushState({ screen: 's-pro-access' }, '');
     setTimeout(() => document.getElementById('pro-access-input').focus(), 150);
     window.scrollTo(0, 0);
   }
@@ -5610,6 +5615,7 @@ function openChat() {
   } else {
     document.getElementById('chat-badge').textContent = currentProfile === 'joven' ? 'Joven' : 'Adulto';
   }
+  history.pushState({ screen: 's-chat' }, '');
   window.scrollTo(0, 0);
 
   const container    = document.getElementById('chat-messages');
@@ -6771,6 +6777,74 @@ function hideInstallBanner() {
   if (b) b.remove();
   sessionStorage.setItem('pwa-install-dismissed', '1');
 }
+
+// ══════════════════════════════════════════════
+// NAVEGACIÓN CON BOTÓN "ATRÁS" DEL CELULAR
+// ──────────────────────────────────────────────
+// La app usa pantallas CSS (show/hide), no URLs distintas.
+// Sin esto, el botón "atrás" del SO sale de la app directamente.
+//
+// Solución: pushState en cada transición + popstate para interceptar.
+//
+// Flujo:
+//   chat        → modal "Antes de irte" → pantalla anterior
+//   professional / pro-access / personal / padres → landing
+//   landing     → el navegador sale (es la raíz)
+//   crisis overlay o modal abierto → se cierra primero
+// ══════════════════════════════════════════════
+
+// Estado inicial: la landing ya está activa al cargar.
+// replaceState registra ese estado base para que popstate siempre tenga algo que leer.
+(function() {
+  history.replaceState({ screen: 's-landing' }, '');
+})();
+
+window.addEventListener('popstate', function(event) {
+  var screen = event.state && event.state.screen;
+
+  // ── 1. Cerrar overlays/modales primero (prioridad máxima) ──────
+  var crisisOverlay = document.getElementById('crisis-overlay');
+  if (crisisOverlay && crisisOverlay.classList.contains('active')) {
+    closeCrisisMode();
+    history.pushState({ screen: screen || 's-landing' }, '');
+    return;
+  }
+
+  var exitModal = document.getElementById('exit-modal');
+  if (exitModal && exitModal.style.display === 'flex') {
+    closeExitModal();
+    history.pushState({ screen: screen || 's-chat' }, '');
+    return;
+  }
+
+  var saveModal = document.getElementById('save-consent-modal');
+  if (saveModal && saveModal.classList.contains('open')) {
+    closeSaveConsentModal();
+    history.pushState({ screen: screen || 's-chat' }, '');
+    return;
+  }
+
+  // ── 2. Navegar según la pantalla a la que "regresamos" ─────────
+  if (!screen) return; // sin estado — dejar salir normalmente
+
+  if (screen === 's-chat') {
+    // Popstate nos llevó a "antes del chat" → reempujar s-chat y abrir modal
+    history.pushState({ screen: 's-chat' }, '');
+    goBackFromChat();
+    return;
+  }
+
+  if (screen === 's-professional' || screen === 's-pro-access' ||
+      screen === 's-personal'     || screen === 's-padres') {
+    // Cualquiera de estas → volver a landing
+    document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById('s-landing').classList.add('active');
+    window.scrollTo(0, 0);
+    return;
+  }
+
+  // screen === 's-landing' o desconocido → dejar que el navegador salga
+});
 
 </script>
 
