@@ -5708,8 +5708,10 @@ function confirmExit() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   if (currentProfile === 'padre') {
     document.getElementById('s-padres').classList.add('active');
+    history.pushState({ screen: 's-padres' }, '');
   } else {
     document.getElementById('s-personal').classList.add('active');
+    history.pushState({ screen: 's-personal' }, '');
   }
   window.scrollTo(0, 0);
 }
@@ -6806,44 +6808,45 @@ window.addEventListener('popstate', function(event) {
   var crisisOverlay = document.getElementById('crisis-overlay');
   if (crisisOverlay && crisisOverlay.classList.contains('active')) {
     closeCrisisMode();
-    history.pushState({ screen: screen || 's-landing' }, '');
+    history.pushState(event.state || { screen: 's-landing' }, '');
     return;
   }
 
   var exitModal = document.getElementById('exit-modal');
   if (exitModal && exitModal.style.display === 'flex') {
     closeExitModal();
-    history.pushState({ screen: screen || 's-chat' }, '');
+    history.pushState(event.state || { screen: 's-chat' }, '');
     return;
   }
 
   var saveModal = document.getElementById('save-consent-modal');
   if (saveModal && saveModal.classList.contains('open')) {
     closeSaveConsentModal();
-    history.pushState({ screen: screen || 's-chat' }, '');
+    history.pushState(event.state || { screen: 's-chat' }, '');
     return;
   }
 
-  // ── 2. Navegar según la pantalla a la que "regresamos" ─────────
-  if (!screen) return; // sin estado — dejar salir normalmente
+  // ── 2. Mostrar la pantalla que indica el estado del historial ──
+  // El navegador ya retrocedió un paso — solo mostramos esa pantalla.
+  if (!screen) return;
 
+  // Si estamos "regresando" al chat desde algún otro lado (no debería
+  // pasar normalmente, pero por si acaso), abrimos el modal de salida.
   if (screen === 's-chat') {
-    // Popstate nos llevó a "antes del chat" → reempujar s-chat y abrir modal
     history.pushState({ screen: 's-chat' }, '');
     goBackFromChat();
     return;
   }
 
-  if (screen === 's-professional' || screen === 's-pro-access' ||
-      screen === 's-personal'     || screen === 's-padres') {
-    // Cualquiera de estas → volver a landing
+  // Para cualquier otra pantalla: simplemente mostrarla.
+  // Esto cubre: s-personal → s-landing, s-padres → s-landing,
+  // s-professional → s-personal/padres, s-chat → s-personal/padres, etc.
+  var target = document.getElementById(screen);
+  if (target) {
     document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
-    document.getElementById('s-landing').classList.add('active');
+    target.classList.add('active');
     window.scrollTo(0, 0);
-    return;
   }
-
-  // screen === 's-landing' o desconocido → dejar que el navegador salga
 });
 
 </script>
