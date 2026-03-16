@@ -5368,9 +5368,16 @@ function renderMemoryPreview() {
       + '<i class="fas ' + s.icono + '" style="color:' + s.color + ';font-size:0.8rem;"></i>'
       + '<span style="font-size:0.75rem;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;">' + s.label + '</span>'
       + '</div>';
-    items.forEach(function(txt) {
+    items.forEach(function(item) {
+      var txt   = typeof item === 'string' ? item : (item.texto || '');
+      var fecha = typeof item === 'object' && item.fecha && item.fecha !== 'desconocida'
+        ? new Date(item.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' })
+        : null;
       html += '<div style="padding:6px 10px 6px 14px;border-left:2px solid ' + s.color + '33;'
-        + 'margin-bottom:4px;font-size:0.82rem;color:var(--text-mid);line-height:1.5;">' + txt + '</div>';
+        + 'margin-bottom:4px;font-size:0.82rem;color:var(--text-mid);line-height:1.5;">'
+        + txt
+        + (fecha ? '<span style="font-size:0.7rem;color:var(--text-light);margin-left:8px;">' + fecha + '</span>' : '')
+        + '</div>';
     });
     html += '</div>';
   });
@@ -5390,15 +5397,18 @@ function buildMemoryContext() {
   if (mem.nombre)       lines.push('Nombre: ' + mem.nombre);
   if (mem.sesiones > 1) lines.push('Lleva ' + mem.sesiones + ' conversaciones contigo.');
 
-  if (mem.miedos.length)         { lines.push('\nSus miedos más profundos:');                   mem.miedos.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.inseguridades.length)  { lines.push('\nSus inseguridades:');                           mem.inseguridades.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.heridas.length)        { lines.push('\nHeridas emocionales o temas que le duelen:');   mem.heridas.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.triggers.length)       { lines.push('\nSituaciones que la desestabilizan (triggers):'); mem.triggers.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.fortalezas.length)     { lines.push('\nSus fortalezas y recursos internos:');          mem.fortalezas.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.suenos.length)         { lines.push('\nSus sueños y lo que quiere para su vida:');     mem.suenos.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.valores.length)        { lines.push('\nLo que más valora en la vida:');                 mem.valores.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.vinculos.length)       { lines.push('\nPersonas clave en su vida:');                   mem.vinculos.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.acompanamiento.length) { lines.push('\nCómo prefiere ser acompañada:');                mem.acompanamiento.forEach(function(t){lines.push('  - '+t);}); }
+  // Helper: extrae el texto de un item que puede ser string u objeto {texto, fecha}
+  function txt(item) { return typeof item === 'string' ? item : (item && item.texto) || ''; }
+
+  if (mem.miedos.length)         { lines.push('\nSus miedos más profundos:');                    mem.miedos.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.inseguridades.length)  { lines.push('\nSus inseguridades:');                            mem.inseguridades.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.heridas.length)        { lines.push('\nHeridas emocionales o temas que le duelen:');    mem.heridas.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.triggers.length)       { lines.push('\nSituaciones que la desestabilizan (triggers):'); mem.triggers.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.fortalezas.length)     { lines.push('\nSus fortalezas y recursos internos:');           mem.fortalezas.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.suenos.length)         { lines.push('\nSus sueños y lo que quiere para su vida:');      mem.suenos.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.valores.length)        { lines.push('\nLo que más valora en la vida:');                  mem.valores.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.vinculos.length)       { lines.push('\nPersonas clave en su vida:');                    mem.vinculos.forEach(function(t){lines.push('  - '+txt(t));}); }
+  if (mem.acompanamiento.length) { lines.push('\nCómo prefiere ser acompañada:');                 mem.acompanamiento.forEach(function(t){lines.push('  - '+txt(t));}); }
 
   lines.push('\nCÓMO USAR ESTE PERFIL:');
   lines.push('- Úsalo como lo haría un amigo que te conoce de verdad, no como una base de datos.');
@@ -5425,18 +5435,29 @@ async function extractAndSaveMemory() {
   if (!conversacion.trim()) return;
 
   var mem = loadUserMemory();
+  var ahora = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Construir perfil con fechas para que el modelo sepa la antigüedad de cada item
+  function conFechas(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(function(item) {
+      if (typeof item === 'string') return { texto: item, fecha: 'desconocida' };
+      return item;
+    });
+  }
+
   var perfilActual = JSON.stringify({
     nombre:        mem.nombre,
-    miedos:        mem.miedos,
-    inseguridades: mem.inseguridades,
-    fortalezas:    mem.fortalezas,
-    vinculos:      mem.vinculos,
-    heridas:       mem.heridas,
-    acompanamiento:mem.acompanamiento,
-    suenos:        mem.suenos,
-    triggers:      mem.triggers,
-    valores:       mem.valores
-  });
+    miedos:        conFechas(mem.miedos),
+    inseguridades: conFechas(mem.inseguridades),
+    fortalezas:    conFechas(mem.fortalezas),
+    vinculos:      conFechas(mem.vinculos),
+    heridas:       conFechas(mem.heridas),
+    acompanamiento:conFechas(mem.acompanamiento),
+    suenos:        conFechas(mem.suenos),
+    triggers:      conFechas(mem.triggers),
+    valores:       conFechas(mem.valores)
+  }, null, 2);
 
   var prompt = [
     'Eres un psicólogo clínico que construye un perfil emocional profundo y selectivo.',
@@ -5470,8 +5491,15 @@ async function extractAndSaveMemory() {
     '',
     'REGLAS DE ACTUALIZACIÓN:',
     '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías a menos que la persona lo contradiga.',
-    '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo.',
-    '- Máximo 8 items por campo. Si ya hay 8 y encuentras algo más importante, reemplaza el menos relevante.',
+    '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo o elimínalo.',
+    '- Máximo 8 items por campo. Si ya hay 8 y encuentras algo nuevo más importante, debes reemplazar uno.',
+    '  Para decidir CUÁL reemplazar, usa este criterio combinado:',
+    '  1. Prefiere reemplazar items con fecha antigua (más de 60 días) sobre items recientes.',
+    '  2. Entre items de edad similar, reemplaza el menos profundo o específico.',
+    '  3. NUNCA reemplaces algo que sigue siendo central para entender a la persona, aunque sea antiguo.',
+    '     Ejemplo: una herida de infancia que sigue activa vale más que un trigger reciente superficial.',
+    '- El perfil actual incluye la fecha de cada item — úsala para tomar mejores decisiones.',
+    '- Devuelve los items como strings simples (solo el texto, sin fecha ni objeto).',
     '- Cada item: máximo 20 palabras, en español, en tercera persona, específico y humano.',
     '- Si no sabes el nombre con certeza, deja null.',
     '',
@@ -5500,16 +5528,28 @@ async function extractAndSaveMemory() {
     var extraido = JSON.parse(clean);
     if (!extraido || typeof extraido !== 'object') return;
 
+    // Normaliza un array de items del modelo (strings o {texto,fecha})
+    // y les asigna la fecha de hoy si vienen como string nuevo
+    var hoy = new Date().toISOString().split('T')[0];
+    function normalizarItems(arr) {
+      if (!Array.isArray(arr)) return [];
+      return arr.map(function(item) {
+        if (typeof item === 'string') return { texto: item, fecha: hoy };
+        if (item && item.texto) return { texto: item.texto, fecha: item.fecha || hoy };
+        return null;
+      }).filter(Boolean);
+    }
+
     if (extraido.nombre)                                              mem.nombre        = extraido.nombre.trim();
-    if (Array.isArray(extraido.miedos)         && extraido.miedos.length)         mem.miedos        = extraido.miedos;
-    if (Array.isArray(extraido.inseguridades)  && extraido.inseguridades.length)  mem.inseguridades = extraido.inseguridades;
-    if (Array.isArray(extraido.fortalezas)     && extraido.fortalezas.length)     mem.fortalezas    = extraido.fortalezas;
-    if (Array.isArray(extraido.vinculos)       && extraido.vinculos.length)       mem.vinculos      = extraido.vinculos;
-    if (Array.isArray(extraido.heridas)        && extraido.heridas.length)        mem.heridas       = extraido.heridas;
-    if (Array.isArray(extraido.acompanamiento) && extraido.acompanamiento.length) mem.acompanamiento= extraido.acompanamiento;
-    if (Array.isArray(extraido.suenos)         && extraido.suenos.length)         mem.suenos        = extraido.suenos;
-    if (Array.isArray(extraido.triggers)       && extraido.triggers.length)       mem.triggers      = extraido.triggers;
-    if (Array.isArray(extraido.valores)        && extraido.valores.length)        mem.valores       = extraido.valores;
+    if (Array.isArray(extraido.miedos)         && extraido.miedos.length)         mem.miedos        = normalizarItems(extraido.miedos);
+    if (Array.isArray(extraido.inseguridades)  && extraido.inseguridades.length)  mem.inseguridades = normalizarItems(extraido.inseguridades);
+    if (Array.isArray(extraido.fortalezas)     && extraido.fortalezas.length)     mem.fortalezas    = normalizarItems(extraido.fortalezas);
+    if (Array.isArray(extraido.vinculos)       && extraido.vinculos.length)       mem.vinculos      = normalizarItems(extraido.vinculos);
+    if (Array.isArray(extraido.heridas)        && extraido.heridas.length)        mem.heridas       = normalizarItems(extraido.heridas);
+    if (Array.isArray(extraido.acompanamiento) && extraido.acompanamiento.length) mem.acompanamiento= normalizarItems(extraido.acompanamiento);
+    if (Array.isArray(extraido.suenos)         && extraido.suenos.length)         mem.suenos        = normalizarItems(extraido.suenos);
+    if (Array.isArray(extraido.triggers)       && extraido.triggers.length)       mem.triggers      = normalizarItems(extraido.triggers);
+    if (Array.isArray(extraido.valores)        && extraido.valores.length)        mem.valores       = normalizarItems(extraido.valores);
 
     mem.sesiones  = (mem.sesiones || 0) + 1;
     mem.updatedAt = new Date().toISOString();
