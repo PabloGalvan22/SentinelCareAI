@@ -5230,7 +5230,11 @@ function emptyProfile() {
     fortalezas:    [],
     vinculos:      [],
     heridas:       [],
-    acompanamiento:[]
+    acompanamiento:[],
+    suenos:        [],
+    triggers:      [],
+    valores:       [],
+    valores:       []
   };
 }
 
@@ -5283,7 +5287,8 @@ function renderMemoryPreview() {
   var mem = loadUserMemory();
   var tieneAlgo = mem.nombre
     || mem.miedos.length || mem.inseguridades.length || mem.fortalezas.length
-    || mem.vinculos.length || mem.heridas.length || mem.acompanamiento.length;
+    || mem.vinculos.length || mem.heridas.length || mem.acompanamiento.length
+    || mem.suenos.length || mem.triggers.length || mem.valores.length;
 
   if (!tieneAlgo) {
     container.innerHTML =
@@ -5297,9 +5302,12 @@ function renderMemoryPreview() {
   var secciones = [
     { campo:'miedos',         icono:'fa-shield-halved',  color:'#c0392b',              label:'Miedos'              },
     { campo:'inseguridades',  icono:'fa-cloud-rain',      color:'#8e5ea2',              label:'Inseguridades'       },
-    { campo:'fortalezas',     icono:'fa-seedling',        color:'var(--sage)',           label:'Fortalezas'          },
     { campo:'heridas',        icono:'fa-heart-crack',     color:'var(--orange-alert)',   label:'Heridas emocionales' },
-    { campo:'vinculos',       icono:'fa-people-arrows',   color:'var(--teal)',           label:'Personas clave'      },
+    { campo:'triggers',       icono:'fa-bolt',            color:'#c0392b',              label:'Lo que la desestabiliza' },
+    { campo:'fortalezas',     icono:'fa-seedling',        color:'var(--sage)',           label:'Fortalezas'          },
+    { campo:'suenos',         icono:'fa-star',            color:'var(--gold)',           label:'Sueños y aspiraciones'   },
+    { campo:'valores',        icono:'fa-compass',         color:'var(--teal)',           label:'Valores'                 },
+    { campo:'vinculos',       icono:'fa-people-arrows',   color:'var(--teal)',           label:'Personas clave'          },
     { campo:'acompanamiento', icono:'fa-ear-listen',      color:'var(--gold)',           label:'C\u00f3mo acompa\u00f1arla' }
   ];
 
@@ -5343,19 +5351,23 @@ function buildMemoryContext() {
   var mem = loadUserMemory();
   var tieneAlgo = mem.nombre
     || mem.miedos.length || mem.inseguridades.length || mem.fortalezas.length
-    || mem.vinculos.length || mem.heridas.length || mem.acompanamiento.length;
+    || mem.vinculos.length || mem.heridas.length || mem.acompanamiento.length
+    || mem.suenos.length || mem.triggers.length || mem.valores.length;
   if (!tieneAlgo) return null;
 
   var lines = ['PERFIL EMOCIONAL DE ESTA PERSONA (guardado solo en su dispositivo):'];
-  if (mem.nombre)      lines.push('Nombre: ' + mem.nombre);
+  if (mem.nombre)       lines.push('Nombre: ' + mem.nombre);
   if (mem.sesiones > 1) lines.push('Lleva ' + mem.sesiones + ' conversaciones contigo.');
 
-  if (mem.miedos.length)         { lines.push('\nSus miedos m\u00e1s profundos:');            mem.miedos.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.inseguridades.length)  { lines.push('\nSus inseguridades:');                          mem.inseguridades.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.heridas.length)        { lines.push('\nHeridas emocionales o temas que le duelen:');  mem.heridas.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.fortalezas.length)     { lines.push('\nSus fortalezas y recursos internos:');         mem.fortalezas.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.vinculos.length)       { lines.push('\nPersonas clave en su vida:');                  mem.vinculos.forEach(function(t){lines.push('  - '+t);}); }
-  if (mem.acompanamiento.length) { lines.push('\nC\u00f3mo prefiere ser acompa\u00f1ada:');   mem.acompanamiento.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.miedos.length)         { lines.push('\nSus miedos más profundos:');                   mem.miedos.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.inseguridades.length)  { lines.push('\nSus inseguridades:');                           mem.inseguridades.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.heridas.length)        { lines.push('\nHeridas emocionales o temas que le duelen:');   mem.heridas.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.triggers.length)       { lines.push('\nSituaciones que la desestabilizan (triggers):'); mem.triggers.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.fortalezas.length)     { lines.push('\nSus fortalezas y recursos internos:');          mem.fortalezas.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.suenos.length)         { lines.push('\nSus sueños y lo que quiere para su vida:');     mem.suenos.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.valores.length)        { lines.push('\nLo que más valora en la vida:');                 mem.valores.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.vinculos.length)       { lines.push('\nPersonas clave en su vida:');                   mem.vinculos.forEach(function(t){lines.push('  - '+t);}); }
+  if (mem.acompanamiento.length) { lines.push('\nCómo prefiere ser acompañada:');                mem.acompanamiento.forEach(function(t){lines.push('  - '+t);}); }
 
   lines.push('\nCÓMO USAR ESTE PERFIL:');
   lines.push('- Úsalo como lo haría un amigo que te conoce de verdad, no como una base de datos.');
@@ -5389,7 +5401,10 @@ async function extractAndSaveMemory() {
     fortalezas:    mem.fortalezas,
     vinculos:      mem.vinculos,
     heridas:       mem.heridas,
-    acompanamiento:mem.acompanamiento
+    acompanamiento:mem.acompanamiento,
+    suenos:        mem.suenos,
+    triggers:      mem.triggers,
+    valores:       mem.valores
   });
 
   var prompt = [
@@ -5412,6 +5427,9 @@ async function extractAndSaveMemory() {
     '- Heridas: "Creció sintiendo que sus emociones eran una carga para su familia" / "Una ruptura pasada la dejó con miedo a confiar"',
     '- Vínculos: "Su relación con su madre es fuente de mucho dolor y amor al mismo tiempo" / "Tiene una amiga que es su único apoyo real"',
     '- Acompañamiento: "Necesita sentirse escuchada antes de recibir cualquier consejo" / "Le molesta que le digan que sea fuerte"',
+    '- Sueños: "Quiere estudiar psicología para ayudar a otros como ella" / "Sueña con tener una familia donde se sientan seguros"',
+    '- Triggers: "Se desestabiliza cuando alguien la ignora o no le responde" / "Los conflictos familiares la paralizan emocionalmente"',
+    '- Valores: "La honestidad y la lealtad son lo más importante para ella" / "La familia es su razón de seguir adelante"',
     '',
     'QUÉ NO MERECE RECORDARSE:',
     '- Hechos del día: "tuvo un examen", "discutió con alguien en el trabajo"',
@@ -5422,12 +5440,12 @@ async function extractAndSaveMemory() {
     'REGLAS DE ACTUALIZACIÓN:',
     '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías a menos que la persona lo contradiga.',
     '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo.',
-    '- Máximo 5 items por campo. Si ya hay 5 y encuentras algo más importante, reemplaza el menos relevante.',
+    '- Máximo 8 items por campo. Si ya hay 8 y encuentras algo más importante, reemplaza el menos relevante.',
     '- Cada item: máximo 20 palabras, en español, en tercera persona, específico y humano.',
     '- Si no sabes el nombre con certeza, deja null.',
     '',
     'Formato exacto:',
-    '{ "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [] }'
+    '{ "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [], "suenos": [], "triggers": [], "valores": [] }'
   ].join('\n');
 
   try {
@@ -5458,6 +5476,9 @@ async function extractAndSaveMemory() {
     if (Array.isArray(extraido.vinculos)       && extraido.vinculos.length)       mem.vinculos      = extraido.vinculos;
     if (Array.isArray(extraido.heridas)        && extraido.heridas.length)        mem.heridas       = extraido.heridas;
     if (Array.isArray(extraido.acompanamiento) && extraido.acompanamiento.length) mem.acompanamiento= extraido.acompanamiento;
+    if (Array.isArray(extraido.suenos)         && extraido.suenos.length)         mem.suenos        = extraido.suenos;
+    if (Array.isArray(extraido.triggers)       && extraido.triggers.length)       mem.triggers      = extraido.triggers;
+    if (Array.isArray(extraido.valores)        && extraido.valores.length)        mem.valores       = extraido.valores;
 
     mem.sesiones  = (mem.sesiones || 0) + 1;
     mem.updatedAt = new Date().toISOString();
@@ -5591,17 +5612,27 @@ function openChat() {
   }
   window.scrollTo(0, 0);
 
-  // Only load/init if messages area is empty (avoid duplication on re-open)
-  const container = document.getElementById('chat-messages');
-  if (container.children.length > 0) return;
+  const container    = document.getElementById('chat-messages');
+  const saved        = loadChatSession();
+  const perfilGuardado = saved && saved.profile;
 
-  const saved = loadChatSession();
+  // Si el perfil cambió respecto a la sesión guardada, limpiar y empezar de nuevo
+  if (perfilGuardado && perfilGuardado !== currentProfile) {
+    container.innerHTML = '';
+    chatHistory = [];
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+    const bar = document.getElementById('session-restore-bar');
+    if (bar) bar.style.display = 'none';
+    initChat();
+    return;
+  }
+
+  // Si ya hay mensajes del mismo perfil en pantalla, no duplicar
+  if (container.children.length > 0) return;
 
   if (saved && saved.history && saved.history.length > 0) {
     // ── Restore previous session ──
     chatHistory = saved.history;
-
-    // Show restore banner
     const bar   = document.getElementById('session-restore-bar');
     const label = document.getElementById('session-restore-label');
     if (bar && label) {
@@ -5612,17 +5643,12 @@ function openChat() {
         : 'Retomando conversación del ' + when.toLowerCase();
       bar.style.display = 'flex';
     }
-
-    // Render old messages silently (no TTS, no save)
     insertDateSeparator(formatRelativeDate(saved.savedAt));
     saved.history.forEach(function(m) {
       appendMessageSilent(m.role, m.text, m.time || null);
     });
-
-    // Insert "today" separator before new messages will appear
     const todayLabel = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
     insertDateSeparator('Ahora · ' + todayLabel);
-
   } else {
     // ── Fresh session ──
     initChat();
