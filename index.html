@@ -22,6 +22,15 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- pdf.js: lectura y extracción de texto desde archivos PDF en el panel profesional -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  // Configurar worker de pdf.js (necesario para extracción de texto)
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
 <!-- DOMPurify: sanitiza el HTML generado por marked.parse() antes de inyectarlo al DOM -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 
@@ -3017,7 +3026,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <div class="pro-sidebar">
         <h3><i class="fas fa-file-arrow-up"></i> Carga de archivos (incluye imágenes)</h3>
         <div class="file-uploader" onclick="document.getElementById('proFileInput').click()">
-          <input type="file" id="proFileInput" accept=".csv,.xlsx,.txt,image/*" multiple>
+          <input type="file" id="proFileInput" accept=".csv,.xlsx,.txt,.pdf,image/*" multiple>
           <i class="fas fa-cloud-arrow-up"></i>
           <p>Arrastra o selecciona tu archivo (CSV, Excel, TXT o imágenes)</p>
           <small>Las imágenes se procesarán con OCR automáticamente</small>
@@ -4366,55 +4375,162 @@ document.getElementById('proFileInput').addEventListener('change', async functio
 
 function processNonImageFile(file, allData) {
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    const fileName = file.name;
+    const fileName = file.name.toLowerCase();
 
-    if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
-      reader.onload = ev => {
-        const text = ev.target.result;
-        if (fileName.endsWith('.csv')) {
-          const lines = text.split('\n').filter(l => l.trim());
-          if (lines.length) {
-            const headers = lines[0].split(',').map(h => h.trim());
-            for (let i = 1; i < lines.length; i++) {
-              const vals = lines[i].split(',').map(v => v.trim());
-              if (vals.length === headers.length) {
-                let row = {};
-                headers.forEach((h, j) => row[h] = vals[j]);
-                row.ID = allData.length + 1;
-                allData.push(row);
-              }
-            }
+    // ── PDF ──────────────────────────────────────────────────
+    if (fileName.endsWith('.pdf')) {
+      const reader = new FileReader();
+      reader.onload = async ev => {
+        try {
+          const typedArray = new Uint8Array(ev.target.result);
+          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+          let fullText = '';
+          for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n';
           }
-        } else {
-          text.split('\n').filter(l => l.trim()).forEach((l, idx) => {
-            allData.push({ ID: allData.length + 1, Linea: l.trim() });
+          fullText = fullText.trim();
+          if (fullText) {
+            allData.push({
+              ID: allData.length + 1,
+              Nombre: file.name,
+              Texto_extraido: fullText
+            });
+          } else {
+            // PDF escaneado sin texto — marcar para OCR visual
+            allData.push({
+              ID: allData.length + 1,
+              Nombre: file.name,
+              Texto_extraido: '[PDF sin texto extraíble — puede ser un PDF escaneado]'
+            });
+          }
+        } catch (err) {
+          console.error('Error al leer PDF:', file.name, err);
+          allData.push({
+            ID: allData.length + 1,
+            Nombre: file.name,
+            Texto_extraido: '[Error al procesar PDF]'
           });
         }
         resolve();
       };
-      reader.readAsText(file, 'utf-8');
-    } else if (fileName.endsWith('.xlsx')) {
+      reader.onerror = () => resolve();
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    // ── CSV ───────────────────────────────────────────────────
+    if (fileName.endsWith('.csv')) {
+      const reader = new FileReader();
       reader.onload = ev => {
-        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (rows.length) {
-          const headers = rows[0];
-          for (let i = 1; i < rows.length; i++) {
-            if (!rows[i].length) continue;
-            let row = {};
-            headers.forEach((h, j) => row[h] = rows[i][j] !== undefined ? rows[i][j] : '');
-            row.ID = allData.length + 1;
-            allData.push(row);
+        try {
+          const raw = ev.target.result;
+
+          // Detectar separador: si la primera línea tiene más puntos y comas
+          // que comas, es exportación de Excel español (;). Si no, coma (,).
+          const firstLine = raw.split(/\r?\n/)[0] || '';
+          const sep = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
+
+          // Parser RFC 4180 — maneja campos entre comillas con comas/saltos dentro
+          function parseCSV(text, delimiter) {
+            const rows = [];
+            let row = [], field = '', inQuotes = false, i = 0;
+            const len = text.length;
+            while (i < len) {
+              const ch = text[i];
+              if (inQuotes) {
+                if (ch === '"') {
+                  if (text[i + 1] === '"') { field += '"'; i += 2; continue; } // comilla escapada
+                  inQuotes = false;
+                } else {
+                  field += ch;
+                }
+              } else {
+                if (ch === '"') {
+                  inQuotes = true;
+                } else if (ch === delimiter) {
+                  row.push(field.trim()); field = '';
+                } else if (ch === '\r' && text[i + 1] === '\n') {
+                  row.push(field.trim()); rows.push(row); row = []; field = ''; i++;
+                } else if (ch === '\n') {
+                  row.push(field.trim()); rows.push(row); row = []; field = '';
+                } else {
+                  field += ch;
+                }
+              }
+              i++;
+            }
+            if (field || row.length) { row.push(field.trim()); rows.push(row); }
+            return rows.filter(r => r.some(c => c !== ''));
           }
+
+          const rows = parseCSV(raw, sep);
+          if (rows.length >= 2) {
+            const headers = rows[0];
+            for (let i = 1; i < rows.length; i++) {
+              const vals = rows[i];
+              let rowObj = {};
+              headers.forEach((h, j) => { rowObj[h || `Col${j+1}`] = vals[j] !== undefined ? vals[j] : ''; });
+              rowObj.ID = allData.length + 1;
+              allData.push(rowObj);
+            }
+          }
+        } catch (err) {
+          console.error('Error al leer CSV:', file.name, err);
         }
         resolve();
       };
-      reader.readAsArrayBuffer(file);
-    } else {
-      resolve();
+      reader.onerror = () => resolve();
+      reader.readAsText(file, 'utf-8');
+      return;
     }
+
+    // ── TXT ───────────────────────────────────────────────────
+    if (fileName.endsWith('.txt')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        ev.target.result.split(/\r?\n/).filter(l => l.trim()).forEach(l => {
+          allData.push({ ID: allData.length + 1, Linea: l.trim() });
+        });
+        resolve();
+      };
+      reader.onerror = () => resolve();
+      reader.readAsText(file, 'utf-8');
+      return;
+    }
+
+    // ── XLSX ──────────────────────────────────────────────────
+    if (fileName.endsWith('.xlsx')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          if (rows.length) {
+            const headers = rows[0];
+            for (let i = 1; i < rows.length; i++) {
+              if (!rows[i].length) continue;
+              let row = {};
+              headers.forEach((h, j) => row[h] = rows[i][j] !== undefined ? rows[i][j] : '');
+              row.ID = allData.length + 1;
+              allData.push(row);
+            }
+          }
+        } catch (err) {
+          console.error('Error al leer XLSX:', file.name, err);
+        }
+        resolve();
+      };
+      reader.onerror = () => resolve();
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    // Tipo no reconocido
+    resolve();
   });
 }
 
