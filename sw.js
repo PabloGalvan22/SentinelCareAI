@@ -21,14 +21,23 @@ const PRECACHE_URLS = [
   OFFLINE_URL,           // ← nuevo: fallback garantizado offline
 ];
 
+// Flag que indica si offline.html se precacheó correctamente en install.
+// Si falló (despliegue parcial, primera carga sin red), el fallback de
+// navegación devuelve una respuesta de error limpia en lugar de undefined.
+let offlineCacheReady = false;
+
 // ── Instalación ───────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS).catch(err => {
-        // Si offline.html falla (ej: despliegue parcial), continuamos igualmente
-        console.warn('[SW] Precache parcial:', err);
-      }))
+      .then(cache => cache.addAll(PRECACHE_URLS)
+        .then(() => { offlineCacheReady = true; })
+        .catch(err => {
+          // Si offline.html falla, seguimos pero marcamos el flag
+          console.warn('[SW] Precache parcial — offline.html puede no estar disponible:', err);
+          offlineCacheReady = false;
+        })
+      )
       .then(() => self.skipWaiting())
   );
 });
@@ -92,23 +101,50 @@ self.addEventListener('fetch', event => {
           return res;
         })
         .catch(() =>
-          caches.match(event.request)
-            .then(cached => cached || caches.match(OFFLINE_URL))
+          caches.match(event.request).then(cached => {
+            if (cached) return cached;
+            return caches.match(OFFLINE_URL).then(offlinePage => {
+              if (offlinePage) return offlinePage;
+              // offline.html no está en caché — devolver respuesta mínima
+              // en lugar de undefined (que causaría un error genérico del navegador)
+              console.warn('[SW] offline.html no está en caché. Devolviendo respuesta de error.');
+              return new Response(
+                '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">' +
+                '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+                '<title>Sin conexión</title></head><body style="font-family:sans-serif;' +
+                'display:flex;align-items:center;justify-content:center;min-height:100vh;' +
+                'margin:0;background:#f0f4f0;"><div style="text-align:center;padding:32px">' +
+                '<p style="font-size:1.1rem;color:#2c3e50">Sin conexión a internet.</p>' +
+                '<p style="margin-top:12px;color:#555">Si necesitas ayuda urgente, llama al ' +
+                '<a href="tel:8002900024" style="color:#c0392b;font-weight:700">800 290-0024</a>' +
+                ' (CONASAMA) o al <a href="tel:911" style="color:#c0392b;font-weight:700">911</a>.' +
+                '</p><button onclick="location.reload()" style="margin-top:20px;padding:10px 24px;' +
+                'background:#3d7a8a;color:white;border:none;border-radius:10px;cursor:pointer;' +
+                'font-size:0.95rem">Reintentar</button></div></body></html>',
+                { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+              );
+            });
+          })
         )
     );
     return;
   }
 
-  // ⑤ Assets propios (JS/CSS/imágenes) → network-first con fallback a cache
+  // ⑤ Assets propios (JS/CSS/imágenes) → stale-while-revalidate
+  // Devuelve la versión en caché inmediatamente (carga rápida) y en paralelo
+  // actualiza la caché con la versión más reciente de la red.
+  // Si no hay caché todavía, espera la red normalmente.
   event.respondWith(
-    fetch(event.request)
-      .then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-        }
-        return res;
+    caches.open(CACHE_NAME).then(cache =>
+      cache.match(event.request).then(cached => {
+        const networkFetch = fetch(event.request).then(res => {
+          if (res.ok) cache.put(event.request, res.clone());
+          return res;
+        }).catch(() => cached); // sin red y sin caché → undefined, manejado abajo
+
+        // Si hay caché, la devolvemos de inmediato y actualizamos en background
+        return cached || networkFetch;
       })
-      .catch(() => caches.match(event.request))
+    )
   );
 });

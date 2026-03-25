@@ -6080,6 +6080,63 @@ let audioChunks    = [];
 let isRecording    = false;
 let ttsEnabled     = false;
 let currentUtterance = null;
+// ── Streaming — Aura escribe palabra por palabra ──────────
+// Llama al worker con stream:true y va entregando cada fragmento
+// de texto vía el callback onChunk(delta). Devuelve el texto completo
+// al terminar, o lanza un error si algo falla.
+async function callGroqStream(messages, onChunk) {
+  const response = await fetch(GROQ_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model:       GROQ_MODEL,
+      messages:    messages,
+      temperature: 0.65,
+      max_tokens:  600,
+      stream:      true,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error('HTTP ' + response.status + ': ' + (err.error?.message || 'Error desconocido'));
+  }
+
+  const reader  = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer    = '';
+  let fullText  = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Los eventos SSE llegan como líneas "data: {...}\n"
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // la última puede estar incompleta
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const raw = trimmed.slice(5).trim();
+      if (raw === '[DONE]') return fullText;
+
+      try {
+        const chunk = JSON.parse(raw);
+        const delta = chunk.choices?.[0]?.delta?.content;
+        if (delta) {
+          fullText += delta;
+          onChunk(delta, fullText);
+        }
+      } catch { /* chunk malformado — ignorar */ }
+    }
+  }
+
+  return fullText;
+}
+
 const WHISPER_URL   = PROXY_BASE_URL + '/transcribe';
 const WHISPER_MODEL = 'whisper-large-v3-turbo';
 
@@ -6307,29 +6364,80 @@ async function sendMessage() {
   // Replace the last user entry with enriched content for Groq (don't store file data in history)
   groqMessages[groqMessages.length - 1] = { role: 'user', content: userContent };
 
-  appendTyping();
+  // ── Bubble de streaming ───────────────────────────────
+  // Creamos la burbuja de Aura vacía antes de que llegue la primera palabra.
+  // Esto reemplaza el indicador de typing — la burbuja aparece de inmediato
+  // y el texto se va insertando en tiempo real.
+  const container  = document.getElementById('chat-messages');
+  const now2       = new Date();
+  const timeStr2   = now2.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const aiDiv = document.createElement('div');
+  aiDiv.className = 'msg ai msg-typing'; // msg-typing aplica la animación suave de entrada
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'md-body';
+
+  aiDiv.innerHTML = '<div class="msg-avatar"><i class="fas fa-heart"></i></div>';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.appendChild(bodyEl);
+  const timeEl = document.createElement('span');
+  timeEl.className = 'msg-time';
+  timeEl.textContent = timeStr2;
+  bubble.appendChild(timeEl);
+  aiDiv.appendChild(bubble);
+  container.appendChild(aiDiv);
+
+  // Mostrar puntos de espera hasta que llegue el primer chunk
+  bodyEl.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
 
   try {
-    const result = await callGroq(groqMessages);
-    removeTyping();
+    let fullText = '';
+    let firstChunk = true;
 
-    if (result.ok) {
-      chatHistory.push({ role: 'ai', text: result.text });
-      if (chatHistory.length > CHAT_MAX_MESSAGES) chatHistory = chatHistory.slice(-CHAT_MAX_MESSAGES);
-      appendMessage('ai', result.text);
-      inferMoodFromChat(text); // inferencia silenciosa en segundo plano
-      updateEditButtons();     // mantener botón editar en el último msg del usuario
-    } else {
-      const fallback = 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.';
-      chatHistory.push({ role: 'ai', text: fallback });
-      appendMessage('ai', fallback);
+    fullText = await callGroqStream(groqMessages, function(delta, accumulated) {
+      if (firstChunk) {
+        bodyEl.innerHTML = '';
+        aiDiv.classList.remove('msg-typing');
+        firstChunk = false;
+      }
+      // Añadir solo el fragmento nuevo — sin reemplazar todo el texto
+      bodyEl.appendChild(document.createTextNode(delta));
+      container.scrollTop = container.scrollHeight;
+    });
+
+    // Render final con markdown completo
+    bodyEl.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
+    container.scrollTop = container.scrollHeight;
+
+    // Detección de crisis
+    const lowerText = fullText.toLowerCase();
+    const hasRisk   = CRISIS_WORDS.some(function(w) { return lowerText.includes(w); });
+    if (hasRisk) {
+      const crisisEl = document.createElement('div');
+      crisisEl.className = 'crisis-inline';
+      crisisEl.innerHTML = '<i class="fas fa-phone-volume"></i> '
+        + 'Si estás en peligro, llama ahora: '
+        + '<a href="tel:8002900024"><strong>800 290-0024</strong></a> CONASAMA &nbsp;·&nbsp; '
+        + '<a href="tel:5552598121"><strong>55 5259-8121</strong></a> SAPTEL &nbsp;·&nbsp; '
+        + '<a href="tel:8002222268"><strong>800 222-2268</strong></a> DIF';
+      bubble.insertBefore(crisisEl, bubble.querySelector('.msg-time'));
     }
+
+    // Historial, TTS, mood
+    chatHistory.push({ role: 'ai', text: fullText, time: timeStr2 });
+    if (chatHistory.length > CHAT_MAX_MESSAGES) chatHistory = chatHistory.slice(-CHAT_MAX_MESSAGES);
+    speakText(fullText);
+    inferMoodFromChat(text);
+    updateEditButtons();
+    updateSaveButton();
+
   } catch (err) {
-    removeTyping();
-    const fallback = 'Ups, algo salió mal. Pero quiero que sepas que me importa lo que compartes. Si es urgente, los números de ayuda están siempre disponibles: **800 290-0024** (CONASAMA) o **800 222-2268** (DIF).';
+    aiDiv.remove(); // quitar burbuja vacía si hubo error
+    const fallback = 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.';
     chatHistory.push({ role: 'ai', text: fallback });
     appendMessage('ai', fallback);
-    console.error('Chat error:', err);
+    console.error('Stream error:', err);
   }
 
   document.getElementById('chat-send-btn').disabled = false;

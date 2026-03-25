@@ -39,105 +39,50 @@ const RL_DAY_MS      = 24 * 3600 * 1000;
 const MSG_MAX_COUNT   = 20;    // máx mensajes en el historial (excluyendo system)
 const MSG_MAX_CHARS   = 2000;  // máx caracteres por mensaje individual
 
-// ── NOTA SOBRE PERSISTENCIA DEL RATE LIMITER ─────────────
-//
-// El almacenamiento actual (rateLimitStore) es IN-MEMORY.
-// Esto significa que el rate limit es "best-effort":
-//   • Se resetea en cada cold start (el worker se pone a dormir tras ~30 s
-//     de inactividad y vuelve a despertar vacío).
-//   • En despliegues con múltiples instancias del worker (tráfico alto),
-//     cada instancia tiene su propio mapa → los límites se multiplican.
-//
-// Para producción con usuarios reales se recomienda Cloudflare KV:
-//   Plan Workers Free incluye: 100k lecturas/día, 1k escrituras/día — suficiente.
-//
-// CÓMO MIGRAR A KV (3 pasos):
-//
-//   1. Crear el namespace en Cloudflare Dashboard o con wrangler:
-//        wrangler kv:namespace create "RATE_LIMIT"
-//
-//   2. Agregar el binding en wrangler.toml:
-//        [[kv_namespaces]]
-//        binding = "RATE_LIMIT_KV"
-//        id      = "<el id que te dio el paso anterior>"
-//
-//   3. Reemplazar checkRateLimit() por la versión KV de abajo
-//      (descomenta el bloque y elimina el checkRateLimit() actual).
-//
-// ── VERSIÓN KV (descomentar para activar) ────────────────
-//
-// async function checkRateLimitKV(ip, env) {
-//   const now        = Date.now();
-//   const minKey     = `rl:min:${ip}`;
-//   const dayKey     = `rl:day:${ip}`;
-//
-//   // Leer contadores actuales (null si no existen)
-//   const [minRaw, dayRaw] = await Promise.all([
-//     env.RATE_LIMIT_KV.get(minKey, { type: 'json' }),
-//     env.RATE_LIMIT_KV.get(dayKey, { type: 'json' }),
-//   ]);
-//
-//   const minEntry = minRaw || { count: 0, start: now };
-//   const dayEntry = dayRaw || { count: 0, start: now };
-//
-//   // Reset si la ventana expiró
-//   if (now - minEntry.start > RL_WINDOW_MS) { minEntry.count = 0; minEntry.start = now; }
-//   if (now - dayEntry.start > RL_DAY_MS)    { dayEntry.count = 0; dayEntry.start = now; }
-//
-//   minEntry.count++;
-//   dayEntry.count++;
-//
-//   // TTL en segundos para que KV auto-limpie las entradas
-//   const minTTL = Math.ceil(RL_WINDOW_MS / 1000);
-//   const dayTTL = Math.ceil(RL_DAY_MS    / 1000);
-//
-//   await Promise.all([
-//     env.RATE_LIMIT_KV.put(minKey, JSON.stringify(minEntry), { expirationTtl: minTTL }),
-//     env.RATE_LIMIT_KV.put(dayKey, JSON.stringify(dayEntry), { expirationTtl: dayTTL }),
-//   ]);
-//
-//   if (minEntry.count > RL_MAX_MINUTE) {
-//     const retryAfter = Math.ceil((minEntry.start + RL_WINDOW_MS - now) / 1000);
-//     return { blocked: true, reason: `Demasiadas peticiones. Intenta en ${retryAfter}s.`, retryAfter };
-//   }
-//   if (dayEntry.count > RL_MAX_DAY) {
-//     const retryAfter = Math.ceil((dayEntry.start + RL_DAY_MS - now) / 1000);
-//     return { blocked: true, reason: 'Límite diario alcanzado. Intenta mañana.', retryAfter };
-//   }
-//   return { blocked: false };
-// }
-//
-// ─────────────────────────────────────────────────────────
+// ── Modelos y fallback ────────────────────────────────────
+// Si el modelo primario falla (error 5xx o red), el worker reintenta
+// automáticamente con el modelo de respaldo antes de devolver error.
+const PRIMARY_MODEL  = 'llama-3.3-70b-versatile';
+const FALLBACK_MODEL = 'llama-3.1-8b-instant';
 
-// Almacenamiento en memoria (best-effort — ver nota arriba)
-// Map<ip, { minuteCount, minuteStart, dayCount, dayStart }>
+// ── Rate limiting — híbrido KV / memoria ─────────────────
+//
+// Usa Cloudflare KV cuando el binding RATE_LIMIT_KV está configurado
+// (persistente entre cold starts e instancias). Si no está disponible,
+// cae automáticamente a almacenamiento en memoria (best-effort).
+//
+// CÓMO ACTIVAR KV (2 pasos):
+//
+//   1. Crear el namespace:
+//        wrangler kv:namespace create "RATE_LIMIT"
+//      Copia el `id` que devuelve y pégalo en wrangler.toml
+//      (ya hay un bloque [[kv_namespaces]] preparado — solo pon el id).
+//
+//   2. Desplegar:
+//        wrangler deploy
+//
+//   A partir de ahí el rate limit sobrevive reinicios y funciona
+//   igual en todas las instancias del worker.
+
+// Fallback en memoria para cuando KV no está configurado
 const rateLimitStore = new Map();
 
-function checkRateLimit(ip) {
-  const now  = Date.now();
-  let entry  = rateLimitStore.get(ip);
+function checkRateLimitMemory(ip) {
+  const now   = Date.now();
+  let entry   = rateLimitStore.get(ip);
 
   if (!entry) {
     entry = { minuteCount: 0, minuteStart: now, dayCount: 0, dayStart: now };
     rateLimitStore.set(ip, entry);
   }
 
-  // Reset ventana de minuto si expiró
-  if (now - entry.minuteStart > RL_WINDOW_MS) {
-    entry.minuteCount = 0;
-    entry.minuteStart = now;
-  }
-
-  // Reset ventana de día si expiró
-  if (now - entry.dayStart > RL_DAY_MS) {
-    entry.dayCount = 0;
-    entry.dayStart = now;
-  }
+  if (now - entry.minuteStart > RL_WINDOW_MS) { entry.minuteCount = 0; entry.minuteStart = now; }
+  if (now - entry.dayStart    > RL_DAY_MS)    { entry.dayCount    = 0; entry.dayStart    = now; }
 
   entry.minuteCount++;
   entry.dayCount++;
 
-  // Limpiar IPs inactivas para no acumular memoria indefinidamente
+  // Evitar que el Map crezca indefinidamente
   if (rateLimitStore.size > 5000) {
     for (const [key, val] of rateLimitStore) {
       if (now - val.minuteStart > RL_WINDOW_MS * 2) rateLimitStore.delete(key);
@@ -148,13 +93,59 @@ function checkRateLimit(ip) {
     const retryAfter = Math.ceil((entry.minuteStart + RL_WINDOW_MS - now) / 1000);
     return { blocked: true, reason: `Demasiadas peticiones. Intenta de nuevo en ${retryAfter}s.`, retryAfter };
   }
-
   if (entry.dayCount > RL_MAX_DAY) {
     const retryAfter = Math.ceil((entry.dayStart + RL_DAY_MS - now) / 1000);
     return { blocked: true, reason: 'Límite diario alcanzado. Intenta mañana.', retryAfter };
   }
-
   return { blocked: false };
+}
+
+async function checkRateLimitKV(ip, kv) {
+  const now    = Date.now();
+  const minKey = `rl:min:${ip}`;
+  const dayKey = `rl:day:${ip}`;
+
+  const [minRaw, dayRaw] = await Promise.all([
+    kv.get(minKey, { type: 'json' }),
+    kv.get(dayKey, { type: 'json' }),
+  ]);
+
+  const minEntry = minRaw || { count: 0, start: now };
+  const dayEntry = dayRaw || { count: 0, start: now };
+
+  if (now - minEntry.start > RL_WINDOW_MS) { minEntry.count = 0; minEntry.start = now; }
+  if (now - dayEntry.start > RL_DAY_MS)    { dayEntry.count = 0; dayEntry.start = now; }
+
+  minEntry.count++;
+  dayEntry.count++;
+
+  await Promise.all([
+    kv.put(minKey, JSON.stringify(minEntry), { expirationTtl: Math.ceil(RL_WINDOW_MS / 1000) }),
+    kv.put(dayKey, JSON.stringify(dayEntry), { expirationTtl: Math.ceil(RL_DAY_MS    / 1000) }),
+  ]);
+
+  if (minEntry.count > RL_MAX_MINUTE) {
+    const retryAfter = Math.ceil((minEntry.start + RL_WINDOW_MS - now) / 1000);
+    return { blocked: true, reason: `Demasiadas peticiones. Intenta de nuevo en ${retryAfter}s.`, retryAfter };
+  }
+  if (dayEntry.count > RL_MAX_DAY) {
+    const retryAfter = Math.ceil((dayEntry.start + RL_DAY_MS - now) / 1000);
+    return { blocked: true, reason: 'Límite diario alcanzado. Intenta mañana.', retryAfter };
+  }
+  return { blocked: false };
+}
+
+// Punto de entrada unificado: usa KV si está disponible, memoria si no
+async function checkRateLimit(ip, env) {
+  if (env.RATE_LIMIT_KV) {
+    try {
+      return await checkRateLimitKV(ip, env.RATE_LIMIT_KV);
+    } catch (err) {
+      // Si KV falla por alguna razón, caemos a memoria sin romper el request
+      console.warn('[RL] KV falló, usando memoria:', err.message);
+    }
+  }
+  return checkRateLimitMemory(ip);
 }
 
 // ── Security headers (todas las respuestas) ───────────────
@@ -201,6 +192,42 @@ function errorResponse(message, status, origin, extra = {}) {
   return jsonResponse({ error: { message } }, status, origin, extra);
 }
 
+// ── Error logging — webhook opcional ─────────────────────
+// Si el secret ERROR_WEBHOOK_URL está configurado, los errores de Groq
+// se envían a ese endpoint (Slack, Discord, Make, n8n, etc.).
+// El envío es fire-and-forget: nunca bloquea ni afecta la respuesta al usuario.
+//
+// CÓMO ACTIVAR:
+//   wrangler secret put ERROR_WEBHOOK_URL
+//   → Pega la URL del webhook de Slack/Discord cuando te la pida.
+//
+// Formato Slack (incoming webhook):  https://hooks.slack.com/services/…
+// Formato Discord:                   https://discord.com/api/webhooks/…
+//
+// El worker detecta automáticamente el formato por la URL y adapta el payload.
+function logError(env, context) {
+  if (!env.ERROR_WEBHOOK_URL) return; // no configurado → silencio total
+
+  const url  = env.ERROR_WEBHOOK_URL;
+  const text = `🚨 *SentinelCareAI Worker Error*\n` +
+               `• Tipo: ${context.type}\n` +
+               `• Modelo: ${context.model || '—'}\n` +
+               `• Status: ${context.status || '—'}\n` +
+               `• Detalle: ${context.detail || '—'}\n` +
+               `• IP: ${context.ip || '—'}\n` +
+               `• Hora: ${new Date().toISOString()}`;
+
+  const isDiscord = url.includes('discord.com');
+  const payload   = isDiscord ? { content: text } : { text };
+
+  // Fire-and-forget: no await, no bloqueo
+  fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  }).catch(err => console.warn('[logError] Webhook falló:', err.message));
+}
+
 // ── Main handler ──────────────────────────────────────────
 export default {
   async fetch(request, env) {
@@ -235,7 +262,7 @@ export default {
             || request.headers.get('X-Forwarded-For')?.split(',')[0].trim()
             || 'unknown';
 
-    const rl = checkRateLimit(ip);
+    const rl = await checkRateLimit(ip, env);
     if (rl.blocked) {
       console.warn(`Rate limit hit: ${ip} — ${rl.reason}`);
       return errorResponse(rl.reason, 429, origin, {
@@ -312,12 +339,64 @@ export default {
         ...safe.messages
       ];
 
-            const groqRes = await fetch(GROQ_CHAT_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
-        body:    JSON.stringify(safe),
-      });
+      // ── Llamada a Groq con fallback de modelo ────────────
+      // Intenta con el modelo seleccionado. Si Groq responde con un error
+      // de servidor (5xx) o la red falla, reintenta automáticamente con
+      // FALLBACK_MODEL antes de devolver error al usuario.
+      const isStream = safe.stream === true;
 
+      async function fetchGroq(model) {
+        const payload = { ...safe, model };
+        return fetch(GROQ_CHAT_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader },
+          body:    JSON.stringify(payload),
+        });
+      }
+
+      let groqRes;
+      try {
+        groqRes = await fetchGroq(safe.model);
+        // Si el modelo primario devuelve error de servidor, probamos el fallback
+        if (!groqRes.ok && groqRes.status >= 500 && safe.model !== FALLBACK_MODEL) {
+          console.warn(`[Groq] ${safe.model} → ${groqRes.status}. Reintentando con ${FALLBACK_MODEL}.`);
+          logError(env, { type: 'groq_5xx_fallback', model: safe.model, status: groqRes.status, ip });
+          groqRes = await fetchGroq(FALLBACK_MODEL);
+        }
+      } catch (networkErr) {
+        // Error de red en el modelo primario → intentar con fallback
+        if (safe.model !== FALLBACK_MODEL) {
+          console.warn(`[Groq] Red falló con ${safe.model}. Reintentando con ${FALLBACK_MODEL}.`);
+          logError(env, { type: 'groq_network_fallback', model: safe.model, detail: networkErr.message, ip });
+          try {
+            groqRes = await fetchGroq(FALLBACK_MODEL);
+          } catch (fallbackErr) {
+            logError(env, { type: 'groq_fallback_failed', model: FALLBACK_MODEL, detail: fallbackErr.message, ip });
+            return errorResponse('No se pudo conectar con el servicio de IA. Intenta de nuevo.', 503, origin);
+          }
+        } else {
+          logError(env, { type: 'groq_network_error', model: safe.model, detail: networkErr.message, ip });
+          return errorResponse('No se pudo conectar con el servicio de IA. Intenta de nuevo.', 503, origin);
+        }
+      }
+
+      // ── Respuesta streaming ───────────────────────────────
+      // Cuando stream=true, pasamos el cuerpo SSE directamente al cliente.
+      // El frontend debe consumirlo con fetch + ReadableStream (ver docs).
+      if (isStream) {
+        return new Response(groqRes.body, {
+          status: groqRes.status,
+          headers: {
+            'Content-Type':  'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',   // evita buffering en proxies
+            ...SECURITY_HEADERS,
+            ...corsHeaders(origin),
+          },
+        });
+      }
+
+      // ── Respuesta normal (JSON) ───────────────────────────
       const data = await groqRes.json();
       return jsonResponse(data, groqRes.status, origin);
     }

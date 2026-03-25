@@ -10,6 +10,25 @@ compatibility_date = "2025-01-01"
 # Al guardarlo como secret queda cifrado en Cloudflare y fuera
 # del repositorio — ni el código fuente ni los logs lo exponen.
 
+# ── KV Rate Limiting — activar en 2 pasos ────────────────────────────────
+#
+# El worker ya tiene el código listo. Solo necesitas:
+#
+#   PASO 1 — Crear el namespace (una sola vez):
+#     wrangler kv:namespace create "RATE_LIMIT"
+#     → Copia el `id` que devuelve y pégalo abajo donde dice PEGAR_ID_AQUI
+#
+#   PASO 2 — Desplegar:
+#     wrangler deploy
+#
+# Desde ese momento el rate limit es persistente entre reinicios
+# y consistente en todas las instancias del worker.
+#
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id      = "9a2a2a57f93444c49019058837fec07f"
+
 # ── Observability — logs automáticos en Cloudflare Dashboard (sin costo) ──
 # Permite ver request logs, errores y tiempos de respuesta en tiempo real.
 # Dashboard → Workers → sentinel-proxy → Logs
