@@ -2,12 +2,13 @@ name = "sentinel-proxy"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
-# La API key se agrega como secret (NUNCA en este archivo):
+# Los secrets se agregan con wrangler y NUNCA van en este archivo:
 #   wrangler secret put GROQ_API_KEY
+#   wrangler secret put AURA_SYSTEM_PROMPT
 #
-# Variables de entorno NO sensibles (opcionales):
-# [vars]
-# APP_ENV = "production"
+# AURA_SYSTEM_PROMPT contiene el system prompt completo de Aura.
+# Al guardarlo como secret queda cifrado en Cloudflare y fuera
+# del repositorio — ni el código fuente ni los logs lo exponen.
 
 # ── Observability — logs automáticos en Cloudflare Dashboard (sin costo) ──
 # Permite ver request logs, errores y tiempos de respuesta en tiempo real.
