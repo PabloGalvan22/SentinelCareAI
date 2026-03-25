@@ -3,6 +3,53 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<!--
+  POLÍTICA DE SEGURIDAD DE CONTENIDO (CSP)
+  ─────────────────────────────────────────
+  • script-src incluye 'unsafe-inline' porque la app usa onclick/onchange en el HTML.
+    Eliminar esto requeriría refactorizar todos los event handlers a addEventListener.
+    Con 'unsafe-inline' se pierde protección contra XSS en scripts inline, pero el
+    resto de directivas (connect-src, frame-ancestors, base-uri, form-action) sí
+    protegen contra las amenazas más frecuentes.
+
+  • connect-src limita las llamadas de red al proxy propio — ningún script
+    inyectado puede exfiltrar datos a un dominio externo no autorizado.
+
+  • frame-ancestors 'none' previene clickjacking — la app no puede ser embebida
+    en un iframe desde ningún origen.
+
+  • base-uri 'self' previene ataques de base tag injection.
+
+  • form-action 'none' — la app no usa forms HTML, así que bloqueamos cualquier
+    intento de redirigir datos via POST a un origen externo.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src  'self' 'unsafe-inline'
+              https://cdn.jsdelivr.net
+              https://cdnjs.cloudflare.com;
+  style-src   'self' 'unsafe-inline'
+              https://fonts.googleapis.com
+              https://cdnjs.cloudflare.com;
+  font-src    https://fonts.gstatic.com
+              https://cdnjs.cloudflare.com;
+  img-src     'self' data: blob:;
+  media-src   'self' blob:;
+  connect-src 'self'
+              https://sentinel-proxy.sentinelpablo.workers.dev
+              https://api.groq.com;
+  worker-src  'self' blob:;
+  frame-src   'none';
+  frame-ancestors 'none';
+  base-uri    'self';
+  form-action 'none';
+">
+
+<!-- Protecciones adicionales -->
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>SentinelCareAI — Contigo Siempre</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -5295,6 +5342,7 @@ function emptyProfile() {
     acompanamiento:[],
     suenos:        [],
     triggers:      [],
+    valores:       [],
     valores:       []
   };
 }
@@ -5489,20 +5537,53 @@ async function extractAndSaveMemory() {
     valores:       conFechas(mem.valores)
   }, null, 2);
 
-  var systemPrompt = [
+  var prompt = [
     'Eres un psicólogo clínico que construye un perfil emocional profundo y selectivo.',
-    'Solo registras lo que realmente importa para conocer a esta persona a largo plazo.',
-    'QUÉ MERECE RECORDARSE: miedos profundos, inseguridades centrales, heridas emocionales activas,',
-    'fortalezas, sueños, valores, personas clave, triggers emocionales, cómo prefiere ser acompañada.',
-    'QUÉ NO: hechos del día, datos superficiales, cosas de pasada sin peso emocional.',
-    'REGLAS: fusiona con el perfil actual sin perder lo que ya sabías. Máximo 8 items por campo.',
-    'Devuelve items como strings simples, máx 20 palabras, español, tercera persona.',
-    'Si no sabes el nombre con certeza, deja null.',
-    'Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.',
+    'Tu criterio es estricto: solo registras lo que realmente importa para conocer a esta persona.',
+    '',
+    'PERFIL ACTUAL (lo que ya sabías antes de esta conversación):',
+    perfilActual,
+    '',
+    'CONVERSACIÓN DE HOY:',
+    conversacion,
+    '',
+    'Responde ÚNICAMENTE con JSON válido. Sin markdown ni texto adicional.',
+    'Si la conversación no revela nada nuevo y significativo, devuelve el perfil actual sin cambios.',
+    '',
+    'QUÉ SÍ MERECE RECORDARSE (ejemplos del tipo de cosas que buscas):',
+    '- Miedos: "Teme que si muestra vulnerabilidad la rechacen" / "Le aterra quedarse sola como su madre"',
+    '- Inseguridades: "Cree que no es suficientemente inteligente para lo que sueña" / "Siente que no merece ser amada"',
+    '- Fortalezas: "Tiene una capacidad notable para levantarse después de caer" / "Es profundamente empática con los demás"',
+    '- Heridas: "Creció sintiendo que sus emociones eran una carga para su familia" / "Una ruptura pasada la dejó con miedo a confiar"',
+    '- Vínculos: "Su relación con su madre es fuente de mucho dolor y amor al mismo tiempo" / "Tiene una amiga que es su único apoyo real"',
+    '- Acompañamiento: "Necesita sentirse escuchada antes de recibir cualquier consejo" / "Le molesta que le digan que sea fuerte"',
+    '- Sueños: "Quiere estudiar psicología para ayudar a otros como ella" / "Sueña con tener una familia donde se sientan seguros"',
+    '- Triggers: "Se desestabiliza cuando alguien la ignora o no le responde" / "Los conflictos familiares la paralizan emocionalmente"',
+    '- Valores: "La honestidad y la lealtad son lo más importante para ella" / "La familia es su razón de seguir adelante"',
+    '',
+    'QUÉ NO MERECE RECORDARSE:',
+    '- Hechos del día: "tuvo un examen", "discutió con alguien en el trabajo"',
+    '- Datos superficiales: "le gusta el café", "estudia medicina"',
+    '- Cosas que mencionó de pasada sin peso emocional',
+    '- Nada que no te ayude a acompañarla mejor en el largo plazo',
+    '',
+    'REGLAS DE ACTUALIZACIÓN:',
+    '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías a menos que la persona lo contradiga.',
+    '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo o elimínalo.',
+    '- Máximo 8 items por campo. Si ya hay 8 y encuentras algo nuevo más importante, debes reemplazar uno.',
+    '  Para decidir CUÁL reemplazar, usa este criterio combinado:',
+    '  1. Prefiere reemplazar items con fecha antigua (más de 60 días) sobre items recientes.',
+    '  2. Entre items de edad similar, reemplaza el menos profundo o específico.',
+    '  3. NUNCA reemplaces algo que sigue siendo central para entender a la persona, aunque sea antiguo.',
+    '     Ejemplo: una herida de infancia que sigue activa vale más que un trigger reciente superficial.',
+    '- El perfil actual incluye la fecha de cada item — úsala para tomar mejores decisiones.',
+    '- Devuelve los items como strings simples (solo el texto, sin fecha ni objeto).',
+    '- Cada item: máximo 20 palabras, en español, en tercera persona, específico y humano.',
+    '- Si no sabes el nombre con certeza, deja null.',
+    '',
+    'Formato exacto:',
     '{ "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [], "suenos": [], "triggers": [], "valores": [] }'
   ].join('\n');
-
-  var userPrompt = 'PERFIL ACTUAL:\n' + perfilActual + '\n\nCONVERSACIÓN DE HOY:\n' + conversacion;
 
   try {
     var res = await fetch(GROQ_URL, {
@@ -5510,12 +5591,9 @@ async function extractAndSaveMemory() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userPrompt }
-        ],
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: 1200
+        max_tokens: 600
       })
     });
     if (!res.ok) return;
@@ -6841,14 +6919,6 @@ window.addEventListener('beforeinstallprompt', function(e) {
 // Guardar memoria si el usuario cierra la app sin pasar por el modal de salida
 window.addEventListener('beforeunload', function() {
   if (chatHistory && chatHistory.length >= 3) {
-    extractAndSaveMemory();
-  }
-});
-
-// visibilitychange cubre el caso móvil donde beforeunload no se dispara
-// (iOS/Android mandan la app a background en lugar de cerrarla)
-document.addEventListener('visibilitychange', function() {
-  if (document.visibilityState === 'hidden' && chatHistory && chatHistory.length >= 3) {
     extractAndSaveMemory();
   }
 });
