@@ -22,15 +22,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- pdf.js: lectura y extracción de texto desde archivos PDF en el panel profesional -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>
-  // Configurar worker de pdf.js (necesario para extracción de texto)
-  if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
-</script>
 <!-- DOMPurify: sanitiza el HTML generado por marked.parse() antes de inyectarlo al DOM -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 
@@ -3026,7 +3017,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <div class="pro-sidebar">
         <h3><i class="fas fa-file-arrow-up"></i> Carga de archivos (incluye imágenes)</h3>
         <div class="file-uploader" onclick="document.getElementById('proFileInput').click()">
-          <input type="file" id="proFileInput" accept=".csv,.xlsx,.txt,.pdf,image/*" multiple>
+          <input type="file" id="proFileInput" accept=".csv,.xlsx,.txt,image/*" multiple>
           <i class="fas fa-cloud-arrow-up"></i>
           <p>Arrastra o selecciona tu archivo (CSV, Excel, TXT o imágenes)</p>
           <small>Las imágenes se procesarán con OCR automáticamente</small>
@@ -4375,162 +4366,55 @@ document.getElementById('proFileInput').addEventListener('change', async functio
 
 function processNonImageFile(file, allData) {
   return new Promise((resolve) => {
-    const fileName = file.name.toLowerCase();
+    const reader = new FileReader();
+    const fileName = file.name;
 
-    // ── PDF ──────────────────────────────────────────────────
-    if (fileName.endsWith('.pdf')) {
-      const reader = new FileReader();
-      reader.onload = async ev => {
-        try {
-          const typedArray = new Uint8Array(ev.target.result);
-          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
-          let fullText = '';
-          for (let p = 1; p <= pdf.numPages; p++) {
-            const page = await pdf.getPage(p);
-            const content = await page.getTextContent();
-            const pageText = content.items.map(item => item.str).join(' ');
-            fullText += pageText + '\n';
+    if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
+      reader.onload = ev => {
+        const text = ev.target.result;
+        if (fileName.endsWith('.csv')) {
+          const lines = text.split('\n').filter(l => l.trim());
+          if (lines.length) {
+            const headers = lines[0].split(',').map(h => h.trim());
+            for (let i = 1; i < lines.length; i++) {
+              const vals = lines[i].split(',').map(v => v.trim());
+              if (vals.length === headers.length) {
+                let row = {};
+                headers.forEach((h, j) => row[h] = vals[j]);
+                row.ID = allData.length + 1;
+                allData.push(row);
+              }
+            }
           }
-          fullText = fullText.trim();
-          if (fullText) {
-            allData.push({
-              ID: allData.length + 1,
-              Nombre: file.name,
-              Texto_extraido: fullText
-            });
-          } else {
-            // PDF escaneado sin texto — marcar para OCR visual
-            allData.push({
-              ID: allData.length + 1,
-              Nombre: file.name,
-              Texto_extraido: '[PDF sin texto extraíble — puede ser un PDF escaneado]'
-            });
-          }
-        } catch (err) {
-          console.error('Error al leer PDF:', file.name, err);
-          allData.push({
-            ID: allData.length + 1,
-            Nombre: file.name,
-            Texto_extraido: '[Error al procesar PDF]'
+        } else {
+          text.split('\n').filter(l => l.trim()).forEach((l, idx) => {
+            allData.push({ ID: allData.length + 1, Linea: l.trim() });
           });
         }
         resolve();
       };
-      reader.onerror = () => resolve();
-      reader.readAsArrayBuffer(file);
-      return;
-    }
-
-    // ── CSV ───────────────────────────────────────────────────
-    if (fileName.endsWith('.csv')) {
-      const reader = new FileReader();
+      reader.readAsText(file, 'utf-8');
+    } else if (fileName.endsWith('.xlsx')) {
       reader.onload = ev => {
-        try {
-          const raw = ev.target.result;
-
-          // Detectar separador: si la primera línea tiene más puntos y comas
-          // que comas, es exportación de Excel español (;). Si no, coma (,).
-          const firstLine = raw.split(/\r?\n/)[0] || '';
-          const sep = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
-
-          // Parser RFC 4180 — maneja campos entre comillas con comas/saltos dentro
-          function parseCSV(text, delimiter) {
-            const rows = [];
-            let row = [], field = '', inQuotes = false, i = 0;
-            const len = text.length;
-            while (i < len) {
-              const ch = text[i];
-              if (inQuotes) {
-                if (ch === '"') {
-                  if (text[i + 1] === '"') { field += '"'; i += 2; continue; } // comilla escapada
-                  inQuotes = false;
-                } else {
-                  field += ch;
-                }
-              } else {
-                if (ch === '"') {
-                  inQuotes = true;
-                } else if (ch === delimiter) {
-                  row.push(field.trim()); field = '';
-                } else if (ch === '\r' && text[i + 1] === '\n') {
-                  row.push(field.trim()); rows.push(row); row = []; field = ''; i++;
-                } else if (ch === '\n') {
-                  row.push(field.trim()); rows.push(row); row = []; field = '';
-                } else {
-                  field += ch;
-                }
-              }
-              i++;
-            }
-            if (field || row.length) { row.push(field.trim()); rows.push(row); }
-            return rows.filter(r => r.some(c => c !== ''));
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (rows.length) {
+          const headers = rows[0];
+          for (let i = 1; i < rows.length; i++) {
+            if (!rows[i].length) continue;
+            let row = {};
+            headers.forEach((h, j) => row[h] = rows[i][j] !== undefined ? rows[i][j] : '');
+            row.ID = allData.length + 1;
+            allData.push(row);
           }
-
-          const rows = parseCSV(raw, sep);
-          if (rows.length >= 2) {
-            const headers = rows[0];
-            for (let i = 1; i < rows.length; i++) {
-              const vals = rows[i];
-              let rowObj = {};
-              headers.forEach((h, j) => { rowObj[h || `Col${j+1}`] = vals[j] !== undefined ? vals[j] : ''; });
-              rowObj.ID = allData.length + 1;
-              allData.push(rowObj);
-            }
-          }
-        } catch (err) {
-          console.error('Error al leer CSV:', file.name, err);
         }
         resolve();
       };
-      reader.onerror = () => resolve();
-      reader.readAsText(file, 'utf-8');
-      return;
-    }
-
-    // ── TXT ───────────────────────────────────────────────────
-    if (fileName.endsWith('.txt')) {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        ev.target.result.split(/\r?\n/).filter(l => l.trim()).forEach(l => {
-          allData.push({ ID: allData.length + 1, Linea: l.trim() });
-        });
-        resolve();
-      };
-      reader.onerror = () => resolve();
-      reader.readAsText(file, 'utf-8');
-      return;
-    }
-
-    // ── XLSX ──────────────────────────────────────────────────
-    if (fileName.endsWith('.xlsx')) {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        try {
-          const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          if (rows.length) {
-            const headers = rows[0];
-            for (let i = 1; i < rows.length; i++) {
-              if (!rows[i].length) continue;
-              let row = {};
-              headers.forEach((h, j) => row[h] = rows[i][j] !== undefined ? rows[i][j] : '');
-              row.ID = allData.length + 1;
-              allData.push(row);
-            }
-          }
-        } catch (err) {
-          console.error('Error al leer XLSX:', file.name, err);
-        }
-        resolve();
-      };
-      reader.onerror = () => resolve();
       reader.readAsArrayBuffer(file);
-      return;
+    } else {
+      resolve();
     }
-
-    // Tipo no reconocido
-    resolve();
   });
 }
 
@@ -5411,7 +5295,6 @@ function emptyProfile() {
     acompanamiento:[],
     suenos:        [],
     triggers:      [],
-    valores:       [],
     valores:       []
   };
 }
@@ -5606,53 +5489,20 @@ async function extractAndSaveMemory() {
     valores:       conFechas(mem.valores)
   }, null, 2);
 
-  var prompt = [
+  var systemPrompt = [
     'Eres un psicólogo clínico que construye un perfil emocional profundo y selectivo.',
-    'Tu criterio es estricto: solo registras lo que realmente importa para conocer a esta persona.',
-    '',
-    'PERFIL ACTUAL (lo que ya sabías antes de esta conversación):',
-    perfilActual,
-    '',
-    'CONVERSACIÓN DE HOY:',
-    conversacion,
-    '',
-    'Responde ÚNICAMENTE con JSON válido. Sin markdown ni texto adicional.',
-    'Si la conversación no revela nada nuevo y significativo, devuelve el perfil actual sin cambios.',
-    '',
-    'QUÉ SÍ MERECE RECORDARSE (ejemplos del tipo de cosas que buscas):',
-    '- Miedos: "Teme que si muestra vulnerabilidad la rechacen" / "Le aterra quedarse sola como su madre"',
-    '- Inseguridades: "Cree que no es suficientemente inteligente para lo que sueña" / "Siente que no merece ser amada"',
-    '- Fortalezas: "Tiene una capacidad notable para levantarse después de caer" / "Es profundamente empática con los demás"',
-    '- Heridas: "Creció sintiendo que sus emociones eran una carga para su familia" / "Una ruptura pasada la dejó con miedo a confiar"',
-    '- Vínculos: "Su relación con su madre es fuente de mucho dolor y amor al mismo tiempo" / "Tiene una amiga que es su único apoyo real"',
-    '- Acompañamiento: "Necesita sentirse escuchada antes de recibir cualquier consejo" / "Le molesta que le digan que sea fuerte"',
-    '- Sueños: "Quiere estudiar psicología para ayudar a otros como ella" / "Sueña con tener una familia donde se sientan seguros"',
-    '- Triggers: "Se desestabiliza cuando alguien la ignora o no le responde" / "Los conflictos familiares la paralizan emocionalmente"',
-    '- Valores: "La honestidad y la lealtad son lo más importante para ella" / "La familia es su razón de seguir adelante"',
-    '',
-    'QUÉ NO MERECE RECORDARSE:',
-    '- Hechos del día: "tuvo un examen", "discutió con alguien en el trabajo"',
-    '- Datos superficiales: "le gusta el café", "estudia medicina"',
-    '- Cosas que mencionó de pasada sin peso emocional',
-    '- Nada que no te ayude a acompañarla mejor en el largo plazo',
-    '',
-    'REGLAS DE ACTUALIZACIÓN:',
-    '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías a menos que la persona lo contradiga.',
-    '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo o elimínalo.',
-    '- Máximo 8 items por campo. Si ya hay 8 y encuentras algo nuevo más importante, debes reemplazar uno.',
-    '  Para decidir CUÁL reemplazar, usa este criterio combinado:',
-    '  1. Prefiere reemplazar items con fecha antigua (más de 60 días) sobre items recientes.',
-    '  2. Entre items de edad similar, reemplaza el menos profundo o específico.',
-    '  3. NUNCA reemplaces algo que sigue siendo central para entender a la persona, aunque sea antiguo.',
-    '     Ejemplo: una herida de infancia que sigue activa vale más que un trigger reciente superficial.',
-    '- El perfil actual incluye la fecha de cada item — úsala para tomar mejores decisiones.',
-    '- Devuelve los items como strings simples (solo el texto, sin fecha ni objeto).',
-    '- Cada item: máximo 20 palabras, en español, en tercera persona, específico y humano.',
-    '- Si no sabes el nombre con certeza, deja null.',
-    '',
-    'Formato exacto:',
+    'Solo registras lo que realmente importa para conocer a esta persona a largo plazo.',
+    'QUÉ MERECE RECORDARSE: miedos profundos, inseguridades centrales, heridas emocionales activas,',
+    'fortalezas, sueños, valores, personas clave, triggers emocionales, cómo prefiere ser acompañada.',
+    'QUÉ NO: hechos del día, datos superficiales, cosas de pasada sin peso emocional.',
+    'REGLAS: fusiona con el perfil actual sin perder lo que ya sabías. Máximo 8 items por campo.',
+    'Devuelve items como strings simples, máx 20 palabras, español, tercera persona.',
+    'Si no sabes el nombre con certeza, deja null.',
+    'Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.',
     '{ "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [], "suenos": [], "triggers": [], "valores": [] }'
   ].join('\n');
+
+  var userPrompt = 'PERFIL ACTUAL:\n' + perfilActual + '\n\nCONVERSACIÓN DE HOY:\n' + conversacion;
 
   try {
     var res = await fetch(GROQ_URL, {
@@ -5660,9 +5510,12 @@ async function extractAndSaveMemory() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt }
+        ],
         temperature: 0.1,
-        max_tokens: 600
+        max_tokens: 1200
       })
     });
     if (!res.ok) return;
@@ -6988,6 +6841,14 @@ window.addEventListener('beforeinstallprompt', function(e) {
 // Guardar memoria si el usuario cierra la app sin pasar por el modal de salida
 window.addEventListener('beforeunload', function() {
   if (chatHistory && chatHistory.length >= 3) {
+    extractAndSaveMemory();
+  }
+});
+
+// visibilitychange cubre el caso móvil donde beforeunload no se dispara
+// (iOS/Android mandan la app a background en lugar de cerrarla)
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden' && chatHistory && chatHistory.length >= 3) {
     extractAndSaveMemory();
   }
 });

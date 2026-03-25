@@ -36,8 +36,8 @@ const RL_DAY_MS      = 24 * 3600 * 1000;
 
 // ── Validación de input ───────────────────────────────────
 // Limites para prevenir abuso de tokens y ataques de payload grande.
-const MSG_MAX_COUNT   = 20;    // máx mensajes en el historial (excluyendo system)
-const MSG_MAX_CHARS   = 2000;  // máx caracteres por mensaje individual
+const MSG_MAX_COUNT   = 35;    // máx mensajes en el historial (frontend usa hasta 30)
+const MSG_MAX_CHARS   = 4000;  // máx caracteres por mensaje (archivos adjuntos pueden tener 3000+)
 
 // ── Modelos y fallback ────────────────────────────────────
 // Si el modelo primario falla (error 5xx o red), el worker reintenta
