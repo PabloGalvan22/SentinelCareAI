@@ -2,8 +2,8 @@
   "name": "SentinelCareAI — Contigo Siempre",
   "short_name": "SentinelCare",
   "description": "Apoyo emocional y detección de riesgo con inteligencia artificial",
-  "start_url": "/SentinelCareAI/",
-  "scope": "/SentinelCareAI/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#faf6f0",
@@ -28,13 +28,13 @@
     {
       "name": "Chat de apoyo",
       "short_name": "Chat",
-      "url": "/SentinelCareAI/",
+      "url": "/",
       "description": "Habla con Aura ahora"
     },
     {
       "name": "Líneas de crisis",
       "short_name": "Crisis",
-      "url": "/SentinelCareAI/#crisis",
+      "url": "/#crisis",
       "description": "Contactos de ayuda inmediata"
     }
   ]

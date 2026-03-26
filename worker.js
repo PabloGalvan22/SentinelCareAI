@@ -23,6 +23,7 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1', 
   'null',                              // file:// local
   'https://pablogalvan22.github.io',   // GitHub Pages
+  'https://sentinelcareai.pages.dev',
 ];
 
 const GROQ_CHAT_URL       = 'https://api.groq.com/openai/v1/chat/completions';
