@@ -3,53 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-
-<!--
-  POLÍTICA DE SEGURIDAD DE CONTENIDO (CSP)
-  ─────────────────────────────────────────
-  • script-src incluye 'unsafe-inline' porque la app usa onclick/onchange en el HTML.
-    Eliminar esto requeriría refactorizar todos los event handlers a addEventListener.
-    Con 'unsafe-inline' se pierde protección contra XSS en scripts inline, pero el
-    resto de directivas (connect-src, frame-ancestors, base-uri, form-action) sí
-    protegen contra las amenazas más frecuentes.
-
-  • connect-src limita las llamadas de red al proxy propio — ningún script
-    inyectado puede exfiltrar datos a un dominio externo no autorizado.
-
-  • frame-ancestors 'none' previene clickjacking — la app no puede ser embebida
-    en un iframe desde ningún origen.
-
-  • base-uri 'self' previene ataques de base tag injection.
-
-  • form-action 'none' — la app no usa forms HTML, así que bloqueamos cualquier
-    intento de redirigir datos via POST a un origen externo.
--->
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src  'self' 'unsafe-inline'
-              https://cdn.jsdelivr.net
-              https://cdnjs.cloudflare.com;
-  style-src   'self' 'unsafe-inline'
-              https://fonts.googleapis.com
-              https://cdnjs.cloudflare.com;
-  font-src    https://fonts.gstatic.com
-              https://cdnjs.cloudflare.com;
-  img-src     'self' data: blob:;
-  media-src   'self' blob:;
-  connect-src 'self'
-              https://sentinel-proxy.sentinelpablo.workers.dev
-              https://api.groq.com;
-  worker-src  'self' blob:;
-  frame-src   'none';
-  frame-ancestors 'none';
-  base-uri    'self';
-  form-action 'none';
-">
-
-<!-- Protecciones adicionales -->
-<meta http-equiv="X-Content-Type-Options" content="nosniff">
-<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>SentinelCareAI — Contigo Siempre</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -5342,7 +5295,6 @@ function emptyProfile() {
     acompanamiento:[],
     suenos:        [],
     triggers:      [],
-    valores:       [],
     valores:       []
   };
 }
@@ -5501,14 +5453,20 @@ function buildMemoryContext() {
 }
 
 async function extractAndSaveMemory() {
-  if (!chatHistory || chatHistory.length < 3) return;
+  if (!chatHistory || chatHistory.length < 2) return; // mínimo 1 user + 1 AI
   if (!navigator.onLine) return;
+
+  // Solo extraer si hay mensajes nuevos desde la última extracción
+  var lastExtracted = extractAndSaveMemory._lastHash || '';
+  var currentHash   = chatHistory.length + ':' + (chatHistory[chatHistory.length-1]?.text?.slice(0,40) || '');
+  if (currentHash === lastExtracted) return; // nada nuevo
+  extractAndSaveMemory._lastHash = currentHash;
 
   var conversacion = chatHistory
     .filter(function(m) { return m.text && m.text.length > 3; })
     .map(function(m) { return (m.role === 'user' ? 'Persona: ' : 'Aura: ') + m.text; })
     .join('\n')
-    .slice(0, 4000);
+    .slice(0, 2500); // reducido para que perfilActual + conversacion queden bajo 8000 chars
 
   if (!conversacion.trim()) return;
 
@@ -5537,22 +5495,16 @@ async function extractAndSaveMemory() {
     valores:       conFechas(mem.valores)
   }, null, 2);
 
-  var prompt = [
+  // Las instrucciones van como system message (no cuentan contra MSG_MAX_CHARS del worker).
+  // La conversación y el perfil van como user message.
+  // Esto permite mantener el prompt rico sin que el worker lo rechace por tamaño.
+  var systemPrompt = [
     'Eres un psicólogo clínico que construye un perfil emocional profundo y selectivo.',
     'Tu criterio es estricto: solo registras lo que realmente importa para conocer a esta persona.',
     '',
-    'PERFIL ACTUAL (lo que ya sabías antes de esta conversación):',
-    perfilActual,
-    '',
-    'CONVERSACIÓN DE HOY:',
-    conversacion,
-    '',
-    'Responde ÚNICAMENTE con JSON válido. Sin markdown ni texto adicional.',
-    'Si la conversación no revela nada nuevo y significativo, devuelve el perfil actual sin cambios.',
-    '',
-    'QUÉ SÍ MERECE RECORDARSE (ejemplos del tipo de cosas que buscas):',
+    'QUÉ SÍ MERECE RECORDARSE (ejemplos concretos del tipo de cosas que buscas):',
     '- Miedos: "Teme que si muestra vulnerabilidad la rechacen" / "Le aterra quedarse sola como su madre"',
-    '- Inseguridades: "Cree que no es suficientemente inteligente para lo que sueña" / "Siente que no merece ser amada"',
+    '- Inseguridades: "Sufre tartamudez desde la niñez y le causa mucha inseguridad" / "Cree que no es suficientemente inteligente para lo que sueña"',
     '- Fortalezas: "Tiene una capacidad notable para levantarse después de caer" / "Es profundamente empática con los demás"',
     '- Heridas: "Creció sintiendo que sus emociones eran una carga para su familia" / "Una ruptura pasada la dejó con miedo a confiar"',
     '- Vínculos: "Su relación con su madre es fuente de mucho dolor y amor al mismo tiempo" / "Tiene una amiga que es su único apoyo real"',
@@ -5565,35 +5517,33 @@ async function extractAndSaveMemory() {
     '- Hechos del día: "tuvo un examen", "discutió con alguien en el trabajo"',
     '- Datos superficiales: "le gusta el café", "estudia medicina"',
     '- Cosas que mencionó de pasada sin peso emocional',
-    '- Nada que no te ayude a acompañarla mejor en el largo plazo',
     '',
     'REGLAS DE ACTUALIZACIÓN:',
-    '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías a menos que la persona lo contradiga.',
-    '- Si algo evolucionó (ejemplo: antes tenía miedo X, ahora ya lo superó), actualízalo o elimínalo.',
-    '- Máximo 8 items por campo. Si ya hay 8 y encuentras algo nuevo más importante, debes reemplazar uno.',
-    '  Para decidir CUÁL reemplazar, usa este criterio combinado:',
-    '  1. Prefiere reemplazar items con fecha antigua (más de 60 días) sobre items recientes.',
-    '  2. Entre items de edad similar, reemplaza el menos profundo o específico.',
-    '  3. NUNCA reemplaces algo que sigue siendo central para entender a la persona, aunque sea antiguo.',
-    '     Ejemplo: una herida de infancia que sigue activa vale más que un trigger reciente superficial.',
-    '- El perfil actual incluye la fecha de cada item — úsala para tomar mejores decisiones.',
-    '- Devuelve los items como strings simples (solo el texto, sin fecha ni objeto).',
-    '- Cada item: máximo 20 palabras, en español, en tercera persona, específico y humano.',
+    '- Fusiona el perfil actual con lo nuevo. No pierdas lo que ya sabías.',
+    '- Máximo 8 items por campo. Si ya hay 8, reemplaza el más antiguo o superficial.',
+    '- Devuelve items como strings simples, máx 20 palabras, español, tercera persona.',
     '- Si no sabes el nombre con certeza, deja null.',
-    '',
-    'Formato exacto:',
-    '{ "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [], "suenos": [], "triggers": [], "valores": [] }'
+    '- Responde ÚNICAMENTE con JSON válido. Sin markdown ni texto adicional.',
+    '- Formato: { "nombre": null, "miedos": [], "inseguridades": [], "fortalezas": [], "vinculos": [], "heridas": [], "acompanamiento": [], "suenos": [], "triggers": [], "valores": [] }'
   ].join('\n');
 
+  var userPrompt = 'PERFIL ACTUAL:\n' + perfilActual + '\n\nCONVERSACIÓN DE HOY:\n' + conversacion;
+
   try {
-    var res = await fetch(GROQ_URL, {
+    // Usamos /extract-memory en lugar de /chat para que el worker
+    // NO reemplace el system prompt con AURA_SYSTEM_PROMPT.
+    // El endpoint dedicado respeta el system prompt de extracción de perfil.
+    var res = await fetch(PROXY_BASE_URL + '/extract-memory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt }
+        ],
         temperature: 0.1,
-        max_tokens: 600
+        max_tokens: 1200
       })
     });
     if (!res.ok) return;
@@ -5629,7 +5579,8 @@ async function extractAndSaveMemory() {
     if (Array.isArray(extraido.triggers)       && extraido.triggers.length)       mem.triggers      = normalizarItems(extraido.triggers);
     if (Array.isArray(extraido.valores)        && extraido.valores.length)        mem.valores       = normalizarItems(extraido.valores);
 
-    mem.sesiones  = (mem.sesiones || 0) + 1;
+    mem.sesiones  = (mem.sesiones || 0) + (extractAndSaveMemory._sessionCounted ? 0 : 1);
+    extractAndSaveMemory._sessionCounted = true; // solo contar una vez por carga de página
     mem.updatedAt = new Date().toISOString();
     saveUserMemory(mem);
 
@@ -6479,6 +6430,12 @@ async function sendMessage() {
     updateEditButtons();
     updateSaveButton();
 
+    // Extraer memoria en background. Si el panel está abierto, refrescarlo.
+    extractAndSaveMemory().then(function() {
+      var panel = document.getElementById('memory-panel');
+      if (panel && panel.style.display !== 'none') renderMemoryPreview();
+    }).catch(function() {});
+
   } catch (err) {
     aiDiv.remove(); // quitar burbuja vacía si hubo error
     const fallback = 'Lo siento, estoy teniendo dificultades técnicas. Pero recuerda que no estás solo: si necesitas apoyo inmediato, puedes llamar a CONASAMA al **800 290-0024** o al DIF **800 222-2268**. Estoy aquí para cuando quieras intentarlo de nuevo.';
@@ -6918,7 +6875,15 @@ window.addEventListener('beforeinstallprompt', function(e) {
 // ── Al cargar la página ───────────────────────────────────────
 // Guardar memoria si el usuario cierra la app sin pasar por el modal de salida
 window.addEventListener('beforeunload', function() {
-  if (chatHistory && chatHistory.length >= 3) {
+  if (chatHistory && chatHistory.length >= 2) {
+    extractAndSaveMemory();
+  }
+});
+
+// visibilitychange cubre el caso móvil donde beforeunload no se dispara
+// (iOS/Android mandan la app a background en lugar de cerrarla)
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden' && chatHistory && chatHistory.length >= 2) {
     extractAndSaveMemory();
   }
 });

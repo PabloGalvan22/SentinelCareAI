@@ -1,411 +1,432 @@
 # SentinelCareAI — Contigo Siempre
 
-> Apoyo emocional con inteligencia artificial, detección de riesgo y acompañamiento personalizado. Todo local, todo privado.
-> 
-> Plataforma PWA de apoyo emocional y detección de riesgo con inteligencia artificial.
-> 
-> Diseñada para el contexto hispanohablante mexicano.
-
-
-![Versión](https://img.shields.io/badge/versión-2.2-teal)
-![PWA](https://img.shields.io/badge/PWA-ready-blue)
-![Modelo](https://img.shields.io/badge/modelo-Llama%203.3%2070B-orange)
-![Offline](https://img.shields.io/badge/offline-compatible-green)
+Plataforma de apoyo emocional y detección de riesgo con inteligencia artificial, diseñada para el contexto mexicano. Combina una IA conversacional empática (Aura) con herramientas clínicas para profesionales de salud mental y educación.
 
 ---
 
-## ¿Qué es SentinelCareAI?
+## Índice
 
-SentinelCareAI es una Progressive Web App (PWA) de apoyo emocional y salud mental impulsada por IA. Su núcleo es **Aura**, una presencia cálida y empática que acompaña a las personas en conversaciones difíciles, aprende de cada persona a lo largo del tiempo y adapta su forma de interactuar según quién está al otro lado.
-
-El proyecto tiene dos grandes áreas:
-
-- **Área personal** — para usuarios individuales (jóvenes, adultos, padres/madres) que buscan apoyo emocional.
-- **Área profesional** — para profesionales de salud mental y educadores, con herramientas de análisis de riesgo, evaluación clínica y detección de señales de alerta.
+- [Arquitectura general](#arquitectura-general)
+- [Archivos del proyecto](#archivos-del-proyecto)
+- [Perfiles de usuario](#perfiles-de-usuario)
+- [Módulo de chat — Aura](#módulo-de-chat--aura)
+- [Sistema de memoria emocional](#sistema-de-memoria-emocional)
+- [Rastreador de bienestar](#rastreador-de-bienestar)
+- [Modo Profesional](#modo-profesional)
+- [Modo Padres de Familia](#modo-padres-de-familia)
+- [Modo Crisis](#modo-crisis)
+- [PWA e instalación](#pwa-e-instalación)
+- [Soporte offline](#soporte-offline)
+- [Cloudflare Worker (proxy)](#cloudflare-worker-proxy)
+- [Rate limiting](#rate-limiting)
+- [Seguridad](#seguridad)
+- [Despliegue](#despliegue)
+- [Variables de entorno y secrets](#variables-de-entorno-y-secrets)
+- [Tecnologías utilizadas](#tecnologías-utilizadas)
 
 ---
 
-## Estructura del proyecto
+## Arquitectura general
 
 ```
-SentinelCareAI/
-├── index.html          # App completa (SPA — todo en un solo archivo)
-├── manifest.json       # Configuración PWA
-├── sw.js               # Service Worker (caché offline)
-├── offline.html        # Pantalla sin conexión con líneas de crisis
-├── worker.js           # Cloudflare Worker — proxy seguro hacia Groq
-├── wrangler.toml       # Configuración de despliegue del Worker
-├── favicon.ico
-├── icon-192.png
-└── icon-512.png
+Navegador (index.html)
+    │
+    │  POST /chat             → conversación con Aura (streaming SSE)
+    │  POST /transcribe       → transcripción de voz (Whisper)
+    │  POST /extract-memory   → extracción de perfil emocional (JSON puro)
+    ▼
+Cloudflare Worker (worker.js)
+    │
+    │  inyecta AURA_SYSTEM_PROMPT  (solo en /chat)
+    │  rate limiting KV + memoria
+    │  allowlist de modelos y campos
+    ▼
+Groq API (Llama 3.3 70B / fallback Llama 3.1 8B)
 ```
 
----
-
-## Pantallas de la aplicación
-
-| ID | Pantalla | Descripción |
-|----|----------|-------------|
-| `s-landing` | Inicio | Selección de perfil |
-| `s-personal` | Personal | Dashboard para jóvenes y adultos |
-| `s-padres` | Padres | Guía para padres y madres |
-| `s-chat` | Chat | Conversación con Aura |
-| `s-pro-access` | Acceso profesional | Pantalla de contraseña |
-| `s-professional` | Panel profesional | Herramientas clínicas y educativas |
+El frontend es un **Single-Page Application** puro (HTML + JS vanilla, sin frameworks). Toda la persistencia es `localStorage` del dispositivo del usuario — no hay base de datos ni servidor de sesión.
 
 ---
 
-## Navegación con botón "atrás" del sistema operativo
+## Archivos del proyecto
 
-Implementado con `history.pushState` en cada transición y `window.addEventListener('popstate', ...)` para interceptar el gesto nativo del celular. Se comporta como una app nativa.
-
-| Dónde estás | Qué hace el botón atrás |
-|-------------|------------------------|
-| Chat | Va a la pantalla personal o padres (según perfil) |
-| Personal / Padres | Va a la landing (selección de perfil) |
-| Pro-Access / Profesional | Va a la landing |
-| Landing | Sale de la app |
-| Crisis overlay o modal abierto | Lo cierra primero |
-
-Al retroceder desde el chat con el botón del sistema, Aura guarda la memoria silenciosamente antes de salir.
+| Archivo | Descripción |
+|---|---|
+| `index.html` | Aplicación completa (~7 100 líneas). Contiene HTML, CSS y JS. |
+| `worker.js` | Cloudflare Worker: proxy seguro a Groq con rate limiting. |
+| `sw.js` | Service Worker v2: caché PWA, estrategia network-first + offline fallback. |
+| `offline.html` | Pantalla de sin conexión con líneas de crisis disponibles sin internet. |
+| `manifest.json` | Manifiesto PWA: iconos, shortcuts, colores, orientación. |
+| `wrangler.toml` | Configuración de despliegue Cloudflare (KV namespace, observabilidad). |
+| `icon-192.png` | Ícono PWA 192 × 192 px. |
+| `icon-512.png` | Ícono PWA 512 × 512 px. |
+| `favicon.ico` | Favicon del navegador. |
 
 ---
 
 ## Perfiles de usuario
 
-Cada perfil tiene su propio **prompt de sistema** (`getSystemPrompt()`) y su propio **primer mensaje** (`initChat()`), completamente diferenciados.
+La landing presenta cinco perfiles, cada uno con un system prompt y UI adaptados:
 
-### 👤 Joven
-- Tono espontáneo e informal, como un hermano mayor de confianza
-- Valida emociones sin minimizarlas ni decir "a tu edad es normal"
-- Entiende presión académica, redes sociales, identidad, relaciones
-- Primer mensaje: *"Hola 👋 Soy Aura. Estoy aquí para escucharte — sin juicios, sin carreras..."*
+| ID | Perfil | Descripción |
+|---|---|---|
+| `joven` | Joven | Apoyo emocional para adolescentes y jóvenes adultos. |
+| `adulto` | Adulto | Acompañamiento para adultos en crisis o malestar emocional. |
+| `salud` | Profesional de salud | Herramientas clínicas. Requiere contraseña. |
+| `maestro` | Maestro / orientador | Herramientas para detección en aula. Requiere contraseña. |
+| `padres` | Padres de familia | Guía para identificar señales de riesgo en hijos. |
 
-### 👤 Adulto
-- Tono sereno y reflexivo, sin condescendencia
-- Reconoce el peso de las responsabilidades
-- Entiende duelo, relaciones de pareja, pérdida de rumbo, agotamiento
-- No infantiliza, confía en la madurez de la persona
-- Primer mensaje: *"Hola 👋 Soy Aura, tu asistente de apoyo. Estoy aquí para escucharte sin juzgarte..."*
-
-### 👤 Padre / Madre
-- Valida primero el miedo y el amor detrás de la preocupación
-- Orienta sin culpar
-- Detecta señales de alerta en los hijos y orienta hacia recursos
-- Recuerda que el padre también necesita ser escuchado
-- Primer mensaje: *"Hola 👋 Soy Aura. Sé que acompañar a un hijo cuando está mal puede ser de las cosas más difíciles..."*
+Los perfiles `salud` y `maestro` pasan por `verifyProAccess()`, que compara un hash SHA-256 de la contraseña ingresada contra `_PRO_HASH` (hardcoded en el cliente — cambiar en producción por validación server-side si se requiere mayor seguridad).
 
 ---
 
-## Aura — El chatbot
+## Módulo de chat — Aura
 
-### Motor
-- **Modelo principal:** `llama-3.3-70b-versatile` vía Groq
-- **Modelo de inferencia ligera:** `llama-3.1-8b-instant` (tareas en segundo plano)
-- **Transcripción de voz:** Whisper `whisper-large-v3-turbo`
+### Flujo principal (`sendMessage`)
 
-### Capacidades del chat
-- Respuestas empáticas adaptadas al perfil activo (joven / adulto / padre)
-- Soporte para texto, imágenes y archivos adjuntos
-- Entrada por voz (STT con Groq Whisper)
-- Lectura en voz alta de respuestas (TTS con Web Speech API)
-- Renderizado de Markdown en las respuestas de Aura
-- Detección automática de palabras de crisis con banner de líneas de ayuda
-- Contador de caracteres (límite 2,000)
-- Indicador de escritura animado
-- Reintento automático ante errores de red (hasta 3 intentos)
+1. Valida longitud máxima (2 000 caracteres).
+2. Adjunta archivos pendientes (imágenes como base64, texto como contenido).
+3. Infiere el estado de ánimo del mensaje (`inferMoodFromChat`) — llamada ligera al LLM que devuelve un valor 1–5.
+4. Llama a `callGroqStream` (streaming SSE) o `callGroq` (JSON, fallback sin streaming).
+5. Muestra la respuesta token a token con efecto de escritura.
+6. Al completarse: ejecuta `extractAndSaveMemory()` en background.
+7. Detecta palabras de crisis en la respuesta → activa banner o modo crisis completo.
 
-### Editar el último mensaje
-El usuario puede editar su último mensaje enviado tocando el botón ✏️ que aparece sobre él. Al tocarlo:
-- Se borra del chat ese mensaje y la respuesta de Aura que vino después
-- El texto vuelve al input para que el usuario lo corrija
-- Al reenviar, Aura responde como si el mensaje anterior no hubiera existido
-- El botón ✏️ siempre está solo en el último mensaje del usuario — nunca en los anteriores
+### Streaming (`callGroqStream`)
 
-### Exportación
-- Exportar conversación como **PDF** con formato visual completo (jsPDF)
+Usa `fetch` + `ReadableStream` para consumir los eventos `data: {...}` de Groq SSE. Cada chunk se parsea y el delta de texto se agrega al burbuja activa del chat. El worker pasa el body del stream directamente al cliente sin buffering (`X-Accel-Buffering: no`).
 
-### Persistencia de sesión
-- El historial **no se guarda automáticamente**
-- El usuario puede guardarlo manualmente con consentimiento explícito
-- Se guarda en `localStorage` con clave `sentinelChatSession`
-- Auto-expira a los 7 días sin actividad
-- Máximo 30 mensajes almacenados
+### Entrada de voz
 
----
+- Botón de micrófono → `startRecording()` usa `MediaRecorder` con `audio/webm`.
+- Al soltar: `transcribeAudio()` envía el blob como `FormData` al endpoint `/transcribe` del worker.
+- El worker lo reenvía a Groq Whisper (`whisper-large-v3`) y devuelve el texto transcrito.
+- El texto se inserta en el input de chat listo para enviar.
 
-## Memoria persistente local — "Lo que Aura sabe de ti"
+### Text-to-Speech (TTS)
 
-Aura aprende de cada persona a lo largo del tiempo. Todo se guarda **únicamente en el dispositivo** con `localStorage`. Ningún servidor recibe este dato.
+- Toggle en la barra inferior del chat.
+- `speakText()` usa la Web Speech API (`speechSynthesis`).
+- Selecciona automáticamente una voz en español si está disponible.
+- `stopTTS()` cancela cualquier utterance en curso (se llama al salir del chat o iniciar nueva conversación).
 
-### Cómo funciona
+### Adjuntar archivos
 
-1. **Al salir del chat** → `extractAndSaveMemory()` analiza la conversación silenciosamente y extrae lo importante usando `llama-3.1-8b-instant`
-2. **Al iniciar el chat** → `buildMemoryContext()` inyecta el perfil guardado como contexto adicional para Aura
-3. **En cada mensaje** → Aura recibe el perfil y lo usa de forma natural, como lo haría un amigo que te conoce
+- Imágenes: se convierten a base64 y se envían como `image_url` en el mensaje multimodal (requiere modelo con visión: `llama-3.2-11b-vision-preview` o `llama-3.2-90b-vision-preview`).
+- Archivos de texto / PDF: el contenido se extrae y se incluye como texto en el mensaje.
+- Se muestra un chip de preview por cada archivo adjunto con botón de eliminar.
 
-### Qué guarda (solo lo que realmente importa)
+### Edición del último mensaje
 
-| # | Categoría | Ícono | Ejemplo |
-|---|-----------|-------|---------|
-| 1 | `miedos` | 🛡️ | "Teme que si muestra vulnerabilidad la rechacen" |
-| 2 | `inseguridades` | 🌧️ | "Cree que no es suficientemente inteligente para lo que sueña" |
-| 3 | `heridas` | 💔 | "Creció sintiendo que sus emociones eran una carga para su familia" |
-| 4 | `triggers` | ⚡ | "Se desestabiliza cuando alguien la ignora o no le responde" |
-| 5 | `fortalezas` | 🌱 | "Tiene una capacidad notable para levantarse después de caer" |
-| 6 | `valores` | 🧭 | "La honestidad y la lealtad son lo más importante para ella" |
-| 7 | `suenos` | ⭐ | "Quiere estudiar psicología para ayudar a otros como ella" |
-| 8 | `vinculos` | 👥 | "Su relación con su madre es fuente de dolor y amor al mismo tiempo" |
-| 9 | `acompanamiento` | 👂 | "Necesita sentirse escuchada antes de recibir cualquier consejo" |
+`editLastMessage()` permite modificar el último mensaje enviado: restaura el texto en el input, elimina el par usuario+IA del historial y del DOM, y vuelve a enviarlo al guardar.
 
-### Qué NO guarda
-- Hechos del día sin peso emocional ("tuvo un examen", "fue al gimnasio")
-- Datos superficiales ("le gusta el café", "estudia medicina")
-- Nada que no ayude a acompañar mejor en el largo plazo
+### Persistencia de sesión (con consentimiento)
 
-### Límites
-- **9 categorías × 8 items = 72 datos máximos** en el perfil
-- Los datos menos relevantes se reemplazan cuando una categoría está llena
-- Sin fecha de expiración fija — el perfil crece y se refina con la persona
+El historial **no se guarda automáticamente**. El usuario debe pulsar "Guardar" y aceptar el modal de consentimiento. Se almacena en `localStorage` bajo `sentinelChatSession` con expiración de 7 días y máximo 30 mensajes. El borrado es inmediato desde "Nueva conversación".
 
-### Control del usuario
-- Tarjeta visual "Lo que Aura recuerda de ti" en la pantalla personal
-- Botón **Borrar memoria** con confirmación — borra todo de forma irrevocable
-- Borrar conversación **no borra la memoria** (son dos cosas independientes)
+### Exportar chat a PDF
+
+`exportChatPDF()` usa **jsPDF** para generar un PDF con el historial completo de la conversación, incluyendo metadatos de fecha y perfil.
 
 ---
 
-## Rastreador de bienestar emocional
+## Sistema de memoria emocional
 
-Gráfica de línea que muestra el estado emocional de los últimos 7 días.
+### Propósito
 
-### Dos formas de actualizar
+Aura aprende sobre la persona a lo largo de múltiples sesiones. Al terminar cada conversación, un LLM analiza el intercambio y extrae un perfil emocional estructurado guardado en `localStorage`.
 
-**👆 Registro manual** — el usuario toca uno de los 5 emojis (Muy bien → Muy mal). Siempre tiene prioridad absoluta.
+### Campos del perfil
 
-**💬 Detección automática del chat** — después de cada mensaje, `inferMoodFromChat()` hace una llamada silenciosa con `llama-3.1-8b-instant` y estima el estado emocional en escala 1-5. Si ya hay un registro manual hoy, no lo toca. Si hay una inferencia previa, la promedia suavemente (60% viejo / 40% nuevo).
+| Campo | Descripción |
+|---|---|
+| `nombre` | Nombre de la persona (si lo menciona con certeza). |
+| `miedos` | Miedos profundos identificados. |
+| `inseguridades` | Inseguridades recurrentes. |
+| `fortalezas` | Capacidades y resiliencia detectadas. |
+| `vinculos` | Personas clave en su vida y la naturaleza del vínculo. |
+| `heridas` | Heridas emocionales o temas que le causan dolor. |
+| `acompanamiento` | Cómo prefiere ser acompañada (necesita escucha, rechaza consejos, etc.). |
+| `suenos` | Sueños y aspiraciones mencionados. |
+| `triggers` | Situaciones que la desestabilizan emocionalmente. |
+| `valores` | Valores o creencias que guían sus decisiones. |
 
-### Diferenciación visual en la gráfica
-- 🟢 **Punto verde sólido** = registrado manualmente por el usuario
-- ⭕ **Punto hueco teal** = detectado automáticamente del chat
-- Tooltip muestra la fuente al tocar cada punto (`· manual` / `· del chat`)
-- Leyenda aparece automáticamente cuando hay datos inferidos
+Cada item se almacena como `{ texto: string, fecha: "YYYY-MM-DD" }`. Máximo 8 items por campo; si se llena, se reemplaza el más antiguo o superficial.
 
-### Badge de estado
-Debajo de los emojis aparece un badge que indica:
-- *"Detectado por Aura en el chat: Regular · Toca un emoji para corregir"*
-- *"Registrado por ti: Bien"*
+### Flujo técnico (`extractAndSaveMemory`)
 
-### Persistencia
-- `localStorage` con clave `sentinelMoodHistory`
-- Historial ilimitado de días
+1. Solo corre si hay al menos 2 mensajes y hay conexión.
+2. Evita re-extraer si el historial no cambió (hash por longitud + último texto).
+3. Construye un `systemPrompt` con criterios estrictos de qué merece recordarse.
+4. Llama al endpoint **`/extract-memory`** (no `/chat`) para que el worker **no** inyecte `AURA_SYSTEM_PROMPT` — el modelo recibe el prompt de extracción puro y devuelve JSON.
+5. Parsea el JSON, normaliza items (agrega fecha de hoy a strings nuevos), fusiona con el perfil existente y lo guarda.
 
----
+> **Bug corregido:** antes se llamaba a `/chat`, que filtraba el system prompt del cliente y lo reemplazaba con el de Aura. El modelo respondía en lenguaje natural, `JSON.parse` fallaba silenciosamente y el perfil nunca se actualizaba.
 
-## Panel Profesional
+### Panel "Lo que Aura recuerda de ti"
 
-Accesible con contraseña. Dos modos según el perfil:
+`renderMemoryPreview()` muestra el perfil guardado agrupado por campo con íconos y fechas. El usuario puede borrarlo con `confirmClearMemory()`. El panel está en la pantalla de perfil personal (`#s-personal`) y se recarga cada vez que se abre.
 
-### 🩺 Profesional de Salud
-- **Análisis de texto masivo** — carga CSV/XLSX/TXT con mensajes de pacientes
-- **Motor de palabras clave** de riesgo con puntuación por severidad
-- **Validación por LLM** — segunda capa automática para casos ALTO/EXTREMO (lotes de 15)
-- **Niveles de riesgo:** Nulo / Bajo / Medio / Alto / Extremo / Ambigüedad Médica
-- **Escala Columbia** — checklist interactivo de evaluación de riesgo suicida
-- **Factores de riesgo y protección** — checklists clínicos
-- **Notas clínicas** — registro por sesión con exportación CSV
-- **Nube de palabras** de términos críticos detectados
-- **Gráfica de distribución** de niveles de riesgo
-- **Palabras más frecuentes** (top 10, barras horizontales)
-- **OCR** — extracción de texto desde imágenes con Tesseract.js
+### Contexto de memoria en el chat
 
-### 🏫 Maestro / Educador
-- **Checklist de observación en aula** — 14 indicadores con peso ponderado
-- **Puntuación automática** con nivel de alerta y acción recomendada
-- **Protocolos de actuación** paso a paso
-- **Notas de alumnos** — registro anónimo por grupo
-- **Chat con Aura** en modo educativo
-- **Recursos de derivación** para Guanajuato
+`buildMemoryContext()` genera un bloque de texto estructurado con el perfil y lo inyecta al inicio del historial de mensajes que se envía a Aura, para que "recuerde" a la persona desde el primer mensaje de cada sesión.
 
 ---
 
-## Pantalla de Padres
+## Rastreador de bienestar
 
-- Semáforo de señales de alerta (rojo / naranja / verde)
-- Acordeón con guías de conversación
-- Scripts de diálogo sugeridos
-- Recursos de apoyo locales (Guanajuato)
-- Chat con Aura en modo orientación para padres
+Panel en la pantalla personal con selector de estado de ánimo (5 niveles: 😔 Muy mal → 😊 Muy bien) y gráfica de línea (Chart.js) de los últimos 15 días.
 
----
-
-## Botón de pánico — Modo Crisis
-
-Botón flotante visible en **todas las pantallas** en todo momento.
-
-Al tocarlo, abre un overlay de pantalla completa con:
-- Mensaje de contención de Aura
-- Tres tarjetas de llamada directa con un toque:
-  - **800 290-0024** — CONASAMA / Línea de la Vida (24 hrs, gratuita)
-  - **55 5259-8121** — SAPTEL (confidencial, 24 hrs)
-  - **800 222-2268** — DIF Nacional (24 hrs, gratuita)
+- `selectMood(value)` — registra el estado manualmente.
+- `inferMoodFromChat(userText)` — el LLM infiere el estado a partir del mensaje (valor 1–5). Solo sobreescribe si no hay registro manual del día.
+- `updateMoodSourceBadge()` — muestra si el dato del día fue manual o inferido por IA.
+- `buildMoodContext()` — genera un resumen en lenguaje natural del historial emocional de los últimos 14 días para incluirlo como contexto en el chat.
+- Los datos se persisten en `localStorage` bajo `sentinelMoodHistory`.
 
 ---
 
-## Pantalla offline
+## Modo Profesional
 
-Si el dispositivo pierde conexión, el Service Worker sirve `offline.html` con:
-- Mensaje de contención
-- Las mismas líneas de crisis como enlaces `tel:` (funcionan sin internet)
-- Botón para reintentar conexión
+Disponible para perfiles `salud` (psicólogos, médicos) y `maestro` (orientadores educativos). Protegido por contraseña.
+
+### Pestaña: Análisis de casos (`salud`)
+
+- Carga archivos CSV, Excel (`.xlsx`), o imágenes con texto (OCR vía Tesseract.js lazy-loaded).
+- `handleProFiles()` detecta el tipo de archivo y lo procesa.
+- Selector de columna para identificar cuál contiene el texto a analizar.
+- `analyzeFile()` clasifica cada caso con expresiones regulares en niveles de riesgo: **Alto**, **Medio**, **Bajo**, **Sin riesgo**.
+- Métricas en tiempo real: total de casos, alertas altas, posibles falsos positivos.
+- Tabla de resultados filtrable con colores por nivel de riesgo.
+- Nube de palabras de los términos más frecuentes (`updateWordCloud`).
+- Gráfica de distribución por nivel (Chart.js doughnut).
+- Exportar resultados a **CSV** o **Excel (.xlsx)**.
+
+### Validación LLM de casos de alto riesgo (`runLLMValidation`)
+
+- Toma los casos clasificados como "Alto" (hasta `LLM_BATCH_SIZE = 15` por lote).
+- Llama al LLM para que evalúe cada caso: confirma o descarta el riesgo con justificación.
+- Muestra en la tabla si el LLM coincide o difiere de la clasificación por reglas.
+- `runIAAnalysis()` genera un análisis narrativo del conjunto completo de casos.
+
+### Escala Columbia (C-SSRS) (`salud`)
+
+Checklist de la Columbia Suicide Severity Rating Scale con 5 ítems. `updateColumbiaScore()` calcula el nivel de riesgo (Bajo / Moderado / Alto / Crítico) según los ítems seleccionados y muestra recomendaciones de acción.
+
+### Factores de riesgo y protección (`salud`)
+
+Dos listas de checkboxes (factores de riesgo / factores protectores). `toggleCheckFactor()` actualiza el conteo en tiempo real.
+
+### Notas clínicas (`salud`)
+
+`saveNote()` guarda notas de sesión con fecha, nivel de riesgo, plan de acción y seguimiento en `localStorage` (`sentinel_notes`). `renderNotesLog()` muestra el historial. `exportNotes()` genera un PDF con todas las notas.
+
+### Pestaña: Alerta en aula (`maestro`)
+
+Checklist de señales de alerta observables en el aula (conductas, cambios de ánimo, aislamiento, etc.). `updateClassroomScore()` calcula un nivel de preocupación y sugiere el protocolo de acción. `saveStudentNote()` registra observaciones por alumno.
 
 ---
 
-## Proxy — Cloudflare Worker
+## Modo Padres de Familia
 
-`worker.js` actúa como intermediario entre el frontend y la API de Groq. **La API key nunca llega al navegador.**
+Pantalla informativa (`#s-padres`) con:
+
+- Señales de alerta organizadas en semáforo (verde / amarillo / rojo).
+- Guía de cómo iniciar una conversación con un hijo.
+- Recursos y líneas de crisis.
+- Acceso al chat con Aura en modo "padre", con un system prompt adaptado para orientar a padres preocupados por sus hijos.
+
+---
+
+## Modo Crisis
+
+Se activa cuando el LLM detecta contenido de riesgo inmediato en la respuesta de Aura.
+
+- **Banner de crisis**: barra fija en la parte inferior con el número 800 290-0024 (CONASAMA).
+- **Overlay de crisis completo** (`openCrisisMode`): pantalla completa con avatar de Aura, mensaje de contención y tarjetas de teléfonos de emergencia:
+  - CONASAMA · Línea de la Vida — 800 290-0024
+  - SAPTEL — 55 5259-8121
+  - DIF Nacional — 800 222-2268
+  - Emergencias — 911
+- `closeCrisisMode()` regresa al chat y empuja un estado al historial del navegador para que el botón "atrás" lo cierre correctamente.
+
+---
+
+## PWA e instalación
+
+La app es una Progressive Web App instalable en Android, iOS y escritorio.
+
+- `manifest.json` define nombre, íconos, colores, orientación y dos shortcuts (Chat de apoyo, Líneas de crisis).
+- El Service Worker (`sw.js`) se registra al cargar y habilita el uso offline.
+- Lógica de instalación en `index.html`:
+  - **Android**: captura `beforeinstallprompt`, muestra banner flotante (`showInstallBanner`).
+  - **iOS**: detecta Safari en iPhone/iPad y muestra instrucciones manuales (Compartir → Añadir a inicio).
+  - **Escritorio**: botón discreto en el header (`_showDesktopInstallBtn`).
+- `installApp()` dispara el prompt nativo o muestra las instrucciones según la plataforma.
+- El banner se descarta por sesión (`sessionStorage`).
+
+---
+
+## Soporte offline
+
+El Service Worker (`sw.js`) implementa cuatro estrategias según el tipo de recurso:
+
+| Tipo de request | Estrategia |
+|---|---|
+| Proxy Groq (`sentinel-proxy.*.workers.dev`) | Siempre red — nunca cachear. |
+| CDN externos (fonts, Chart.js, marked…) | Cache-first con actualización en background. |
+| Navegación HTML | Network-first; fallback a `offline.html` si no hay red. |
+| Assets propios (JS/CSS/imágenes) | Stale-while-revalidate. |
+
+`offline.html` se **precachea en la instalación** del SW para garantizar que siempre esté disponible. Si el precacheo falla (primer despliegue sin red), el SW devuelve una respuesta HTML mínima inline con los números de crisis.
+
+Al volver online, `updateOnlineStatus()` oculta el banner de sin conexión y reactiva el envío normal.
+
+---
+
+## Cloudflare Worker (proxy)
+
+**Archivo:** `worker.js`  
+**URL base:** `https://sentinel-proxy.sentinelpablo.workers.dev`
 
 ### Endpoints
-| Ruta | Método | Función |
-|------|--------|---------|
-| `/chat` | POST | Chat completions (Llama vía Groq) |
-| `/transcribe` | POST | Transcripción de audio (Whisper vía Groq) |
 
-### Seguridad
-- **CORS** — lista blanca de orígenes autorizados
-- **Allowlist de modelos** — solo modelos aprobados pueden usarse
-- **Límites de parámetros** — `temperature` (0–1.5), `max_tokens` (1–2,000)
-- **Filtro de system prompt** — el worker elimina cualquier `role: system` del cliente e inyecta el prompt autoritativo del servidor
-- **Rate limiting en memoria:**
-  - Máx. 30 requests / minuto por IP
-  - Máx. 500 requests / día por IP
-  - Responde con `429` y cabecera `Retry-After`
+#### `POST /chat`
+Chat con Aura. El worker:
+1. Filtra todos los mensajes `system` del cliente.
+2. Prepende `AURA_SYSTEM_PROMPT` (desde secret cifrado).
+3. Valida modelo (allowlist), temperatura (0–1.5), max_tokens (1–2 000).
+4. Soporta streaming SSE (`stream: true`).
+5. Fallback automático: si el modelo primario devuelve 5xx o falla la red, reintenta con `llama-3.1-8b-instant`.
 
-### Despliegue
+#### `POST /transcribe`
+Transcripción de audio. Reenvía el `FormData` con el audio a Groq Whisper (`whisper-large-v3`) y devuelve el texto.
+
+#### `POST /extract-memory`
+Extracción de perfil emocional. **No inyecta `AURA_SYSTEM_PROMPT`**: pasa los mensajes tal cual para que el system prompt de extracción (JSON puro) llegue intacto al modelo. Temperatura limitada a 0–0.5 para resultados deterministas.
+
+### Modelos permitidos
+
+```
+llama-3.3-70b-versatile   ← primario
+llama-3.1-8b-instant      ← fallback
+llama-3.2-11b-vision-preview
+llama-3.2-90b-vision-preview
+mixtral-8x7b-32768
+gemma2-9b-it
+whisper-large-v3
+```
+
+---
+
+## Rate limiting
+
+Implementación híbrida: usa **Cloudflare KV** si el binding `RATE_LIMIT_KV` está configurado; si no, cae a **memoria en proceso** (best-effort, se reinicia con el worker).
+
+| Límite | Valor |
+|---|---|
+| Por minuto por IP | 30 requests |
+| Por día por IP | 500 requests |
+
+Las claves KV expiran automáticamente (`expirationTtl`). Si KV falla por cualquier razón, el worker continúa usando memoria sin romper el request.
+
+**Para activar KV persistente:**
 ```bash
-# Instalar Wrangler
-npm install -g wrangler
-
-# Autenticarse
-wrangler login
-
-# Agregar la API key como secret (nunca en wrangler.toml)
-wrangler secret put GROQ_API_KEY
-
-# Desplegar
+wrangler kv:namespace create "RATE_LIMIT"
+# Pegar el id devuelto en wrangler.toml → [[kv_namespaces]]
 wrangler deploy
 ```
 
 ---
 
-## PWA — Progressive Web App
+## Seguridad
 
-| Característica | Detalle |
-|----------------|---------|
-| Instalable | Android (banner nativo), iOS (instrucciones), Desktop (botón flotante) |
-| Modo offline | Service Worker con estrategia network-first + fallback a caché |
-| Precaché | `index.html`, `manifest.json`, `offline.html` |
-| Tema | `#3d7a8a` |
-| Orientación | Portrait primary |
-| Display | Standalone |
-| Idioma | Español (`es`) |
-| Shortcuts | "Chat de apoyo", "Líneas de crisis" |
-
-### Estrategias de caché (sw.js)
-- **Proxy Groq** → siempre network, nunca cachear
-- **CDN externos** → cache-first con actualización en background
-- **Assets propios** → network-first con fallback a caché
-- **Navegación sin red** → devuelve `offline.html`
+- **CORS estricto**: solo se responde con `Access-Control-Allow-Origin` a orígenes en `ALLOWED_ORIGINS` (localhost, GitHub Pages). Otros orígenes reciben la respuesta sin el header CORS — el navegador la bloquea.
+- **Security headers** en todas las respuestas: `CSP: default-src 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+- **API key nunca en el cliente**: `GROQ_API_KEY` es un Cloudflare secret cifrado, inaccesible desde el navegador o el repositorio.
+- **System prompt cifrado**: `AURA_SYSTEM_PROMPT` también es un secret — no está en el código fuente ni en los logs.
+- **Allowlist de campos**: el worker solo reenvía a Groq los campos `model`, `messages`, `temperature`, `max_tokens` y `stream`. Cualquier otro campo del cliente se descarta.
+- **Validación de input**: máximo 35 mensajes por request y 8 000 caracteres por mensaje.
+- **DOMPurify**: todo HTML generado por `marked.parse()` (markdown de Aura) se sanitiza antes de inyectarse al DOM.
+- **Error webhook opcional**: si se configura `ERROR_WEBHOOK_URL` (secret), los errores de Groq se envían a Slack/Discord sin bloquear la respuesta al usuario.
 
 ---
 
-## Modo oscuro
+## Despliegue
 
-- Toggle disponible en todas las pantallas con header
-- Preferencia guardada en `localStorage` (`sentinelDark`)
-- Se restaura automáticamente al recargar
-- La gráfica de bienestar se actualiza al cambiar de modo
+### Prerrequisitos
 
----
+- Cuenta en [Cloudflare](https://cloudflare.com) (plan gratuito es suficiente).
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) instalado.
+- Clave de API de [Groq](https://console.groq.com).
 
-## Librerías externas
+### Pasos
 
-| Librería | Versión | Uso |
-|----------|---------|-----|
-| Chart.js | latest | Gráfica de bienestar y análisis profesional |
-| chartjs-plugin-datalabels | 2 | Etiquetas en gráficas del panel profesional |
-| marked | latest | Renderizado de Markdown en respuestas de Aura |
-| DOMPurify | 3.1.6 | Sanitización del HTML generado por marked |
-| jsPDF | 2.5.1 | Exportación de conversaciones a PDF |
-| Font Awesome | 6.5.0 | Íconos |
-| Google Fonts | — | Playfair Display + DM Sans |
-| SheetJS (xlsx) | 0.18.5 | Lectura de archivos Excel en el panel profesional |
-| WordCloud2.js | 1.0.2 | Nube de palabras de riesgo |
-| Tesseract.js | latest | OCR de imágenes en el panel profesional |
+```bash
+# 1. Instalar Wrangler
+npm install -g wrangler
+wrangler login
 
-> Las librerías pesadas (xlsx, WordCloud2, Tesseract) se cargan **bajo demanda** solo cuando el usuario accede al panel profesional, para no afectar el tiempo de carga inicial.
+# 2. Configurar secrets (una sola vez)
+wrangler secret put GROQ_API_KEY
+wrangler secret put AURA_SYSTEM_PROMPT
 
----
+# 3. (Opcional) Activar rate limiting persistente con KV
+wrangler kv:namespace create "RATE_LIMIT"
+# Copiar el id al campo id en wrangler.toml → [[kv_namespaces]]
 
-## localStorage — Claves utilizadas
+# 4. Desplegar el worker
+wrangler deploy
 
-| Clave | Contenido | Cuándo se borra |
-|-------|-----------|-----------------|
-| `sentinelUserMemory` | Perfil emocional de Aura (9 categorías) | Botón "Borrar memoria" |
-| `sentinelMoodHistory` | Historial de bienestar emocional | Manual |
-| `sentinelChatSession` | Última conversación guardada | "Nueva conversación" o modal de salida |
-| `sentinelDark` | Preferencia de modo oscuro | Nunca |
-| `sentinelNotes` | Notas clínicas (profesional de salud) | Botón "Borrar registros" |
-| `sentinelStudentNotes` | Notas de alumnos (educador) | Manual |
+# 5. Publicar el frontend
+# Subir index.html, sw.js, offline.html, manifest.json,
+# icon-192.png, icon-512.png, favicon.ico a GitHub Pages
+# (o cualquier hosting estático).
+```
 
----
+### Actualizaciones posteriores
 
-## Variables de configuración rápida
+Solo el archivo modificado necesita actualizarse:
 
-```js
-// index.html
-const PROXY_BASE_URL    = 'https://sentinel-proxy.sentinelpablo.workers.dev';
-const GROQ_MODEL        = 'llama-3.3-70b-versatile';
-const WHISPER_MODEL     = 'whisper-large-v3-turbo';
-const CHAT_MAX_DAYS     = 7;    // días antes de expirar sesión guardada
-const CHAT_MAX_MESSAGES = 30;   // mensajes máximos en historial guardado
-const MEMORY_KEY        = 'sentinelUserMemory';
+```bash
+# Cambios en el worker
+wrangler deploy
 
-// worker.js
-const RL_MAX_MINUTE     = 30;   // requests por minuto por IP
-const RL_MAX_DAY        = 500;  // requests por día por IP
+# Cambios en el frontend
+# Subir los archivos modificados a GitHub Pages / hosting estático
+# y hacer bump de CACHE_NAME en sw.js si cambian assets cacheados
 ```
 
 ---
 
-## Despliegue en GitHub Pages
+## Variables de entorno y secrets
 
-1. Sube todos los archivos al repositorio
-2. Activa GitHub Pages desde **Settings → Pages → Deploy from branch → main**
-3. Actualiza `PROXY_BASE_URL` en `index.html` con la URL de tu Worker desplegado
-4. Agrega tu dominio de GitHub Pages a `ALLOWED_ORIGINS` en `worker.js`
-
----
-
-## Privacidad
-
-- **Sin cuentas, sin registro, sin tracking**
-- La conversación con Aura pasa por el Worker (Cloudflare) hacia Groq — el Worker no almacena nada
-- La memoria, el historial de bienestar y las sesiones de chat se guardan **solo en el dispositivo del usuario** con `localStorage`
-- El PDF de conversación se genera completamente en el dispositivo — no se sube a ningún servidor
-- El usuario puede borrar toda su memoria en cualquier momento desde la interfaz
+| Nombre | Tipo | Descripción |
+|---|---|---|
+| `GROQ_API_KEY` | Secret Cloudflare | Clave de API de Groq. Nunca en el repositorio. |
+| `AURA_SYSTEM_PROMPT` | Secret Cloudflare | System prompt completo de Aura. Cifrado en Cloudflare. |
+| `ERROR_WEBHOOK_URL` | Secret Cloudflare (opcional) | URL de webhook para recibir alertas de errores de Groq (Slack, Discord, Make). |
+| `RATE_LIMIT_KV` | KV Binding (opcional) | Namespace de Cloudflare KV para rate limiting persistente. |
 
 ---
 
-## Líneas de crisis disponibles en la app
+## Tecnologías utilizadas
 
-| Línea | Número | Descripción |
-|-------|--------|-------------|
-| CONASAMA — Línea de la Vida | 800 290-0024 | Crisis emocional y suicidio · Gratuita · 24 hrs |
-| SAPTEL | 55 5259-8121 | Apoyo emocional · Confidencial · 24 hrs |
-| DIF Nacional | 800 222-2268 | Violencia familiar y apoyo · Gratuita · 24 hrs |
-| Emergencias | 911 | Riesgo inmediato |
-
----
-
-*Desarrollado con ❤️ para acompañar a las personas en su camino hacia el bienestar emocional.*
+| Tecnología | Uso |
+|---|---|
+| HTML / CSS / JS vanilla | Frontend completo — sin frameworks. |
+| [Groq API](https://console.groq.com) | Inferencia LLM (Llama 3.3 70B) y transcripción (Whisper). |
+| [Cloudflare Workers](https://workers.cloudflare.com) | Proxy seguro, rate limiting, gestión de secrets. |
+| [Cloudflare KV](https://developers.cloudflare.com/kv/) | Rate limiting persistente entre instancias del worker. |
+| [Chart.js](https://www.chartjs.org) + chartjs-plugin-datalabels | Gráfica de bienestar emocional y distribución de casos. |
+| [marked.js](https://marked.js.org) | Renderizado de markdown en respuestas de Aura. |
+| [DOMPurify](https://github.com/cure53/DOMPurify) | Sanitización del HTML generado por marked. |
+| [jsPDF](https://github.com/parallax/jsPDF) | Exportación del chat y notas clínicas a PDF. |
+| [SheetJS (xlsx)](https://sheetjs.com) | Lectura de archivos Excel y exportación de resultados. |
+| [Tesseract.js](https://tesseract.projectnaptha.com) | OCR de imágenes en el módulo profesional (lazy-loaded). |
+| Web Speech API | Text-to-Speech de respuestas de Aura. |
+| MediaRecorder API | Captura de audio para entrada de voz. |
+| Service Worker + Cache API | Soporte offline y estrategias de caché PWA. |
+| Web App Manifest | Instalación PWA en Android, iOS y escritorio. |
+| localStorage | Perfil emocional, historial de bienestar, notas clínicas, sesión de chat. |
+| [Playfair Display + DM Sans](https://fonts.google.com) | Tipografía (Google Fonts). |
+| [Font Awesome 6](https://fontawesome.com) | Íconos de interfaz. |

@@ -37,7 +37,8 @@ const RL_DAY_MS      = 24 * 3600 * 1000;
 // ── Validación de input ───────────────────────────────────
 // Limites para prevenir abuso de tokens y ataques de payload grande.
 const MSG_MAX_COUNT   = 35;    // máx mensajes en el historial (frontend usa hasta 30)
-const MSG_MAX_CHARS   = 4000;  // máx caracteres por mensaje (archivos adjuntos pueden tener 3000+)
+const MSG_MAX_CHARS   = 8000;  // máx caracteres por mensaje
+                               // (extracción de memoria: perfil ~2000 + conversación ~4000 + headers)
 
 // ── Modelos y fallback ────────────────────────────────────
 // Si el modelo primario falla (error 5xx o red), el worker reintenta
@@ -420,6 +421,75 @@ export default {
       return jsonResponse(data, groqRes.status, origin);
     }
 
-    return errorResponse('Ruta no encontrada. Usa /chat o /transcribe', 404, origin);
+    // ── /extract-memory ───────────────────────────────────
+    // Endpoint exclusivo para la extracción de perfil emocional.
+    // A diferencia de /chat, NO inyecta AURA_SYSTEM_PROMPT:
+    // el system prompt de análisis viene del cliente y se respeta tal cual.
+    // Esto evita que el modelo responda como terapeuta en lugar de
+    // devolver el JSON de perfil que buildMemoryContext() espera.
+    if (url.pathname === '/extract-memory') {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return errorResponse('JSON inválido', 400, origin);
+      }
+
+      if (!Array.isArray(body.messages) || body.messages.length === 0) {
+        return errorResponse('El campo "messages" es obligatorio y debe ser un array no vacío.', 400, origin);
+      }
+
+      // Validación idéntica a /chat para consistencia y seguridad
+      const userMsgs = body.messages.filter(m => m.role !== 'system');
+      if (userMsgs.length > MSG_MAX_COUNT) {
+        return errorResponse(`Demasiados mensajes. Máximo permitido: ${MSG_MAX_COUNT}.`, 400, origin);
+      }
+      for (const msg of body.messages) {
+        const content = typeof msg.content === 'string'
+          ? msg.content
+          : JSON.stringify(msg.content ?? '');
+        if (content.length > MSG_MAX_CHARS) {
+          return errorResponse(`Mensaje demasiado largo. Máximo ${MSG_MAX_CHARS} caracteres por mensaje.`, 400, origin);
+        }
+      }
+
+      const ALLOWED_MODELS = [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+      ];
+
+      const safe = {
+        model:       ALLOWED_MODELS.includes(body.model) ? body.model : 'llama-3.3-70b-versatile',
+        messages:    body.messages, // se pasan tal cual — sin inyectar AURA_SYSTEM_PROMPT
+        temperature: Math.min(Math.max(body.temperature ?? 0.1, 0), 0.5), // rango más estricto: extracción debe ser determinista
+        max_tokens:  Math.min(Math.max(body.max_tokens  ?? 1200, 1), 1500),
+      };
+
+      let groqRes;
+      try {
+        groqRes = await fetch(GROQ_CHAT_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader },
+          body:    JSON.stringify(safe),
+        });
+        if (!groqRes.ok && groqRes.status >= 500) {
+          // Fallback al modelo ligero
+          const fallback = { ...safe, model: 'llama-3.1-8b-instant' };
+          groqRes = await fetch(GROQ_CHAT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeader },
+            body: JSON.stringify(fallback),
+          });
+        }
+      } catch (err) {
+        logError(env, { type: 'extract_memory_error', detail: err.message, ip });
+        return errorResponse('No se pudo conectar con el servicio de IA.', 503, origin);
+      }
+
+      const data = await groqRes.json();
+      return jsonResponse(data, groqRes.status, origin);
+    }
+
+    return errorResponse('Ruta no encontrada. Usa /chat, /transcribe o /extract-memory', 404, origin);
   },
 };
