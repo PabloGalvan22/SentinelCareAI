@@ -116,7 +116,7 @@ self.addEventListener('fetch', event => {
                 'margin:0;background:#f0f4f0;"><div style="text-align:center;padding:32px">' +
                 '<p style="font-size:1.1rem;color:#2c3e50">Sin conexión a internet.</p>' +
                 '<p style="margin-top:12px;color:#555">Si necesitas ayuda urgente, llama al ' +
-                '<a href="tel:8002900024" style="color:#c0392b;font-weight:700">800 290-0024</a>' +
+                '<a href="tel:8009112000" style="color:#c0392b;font-weight:700">800 911-2000</a>' +
                 ' (CONASAMA) o al <a href="tel:911" style="color:#c0392b;font-weight:700">911</a>.' +
                 '</p><button onclick="location.reload()" style="margin-top:20px;padding:10px 24px;' +
                 'background:#3d7a8a;color:white;border:none;border-radius:10px;cursor:pointer;' +
