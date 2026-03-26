@@ -1623,6 +1623,39 @@ body.dark-mode #panic-btn { box-shadow: 0 8px 32px rgba(192,57,43,0.65), 0 0 0 0
 body.dark-mode .session-restore-bar  { background: rgba(61,122,138,0.1); border-color: rgba(61,122,138,0.22); }
 body.dark-mode .session-saved-pill   { background: rgba(107,143,113,0.15); }
 
+/* ─── MEMORY STATUS PILL ─────────────────────── */
+.memory-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  transition: opacity 0.4s;
+}
+.memory-pill.processing {
+  color: var(--teal);
+  background: rgba(61,122,138,0.1);
+  border: 1px solid rgba(61,122,138,0.22);
+}
+.memory-pill.ok {
+  color: var(--sage);
+  background: rgba(107,143,113,0.1);
+  border: 1px solid rgba(107,143,113,0.22);
+  animation: pillFlash 0.7s ease;
+}
+.memory-pill.error {
+  color: var(--orange-alert);
+  background: rgba(230,126,34,0.08);
+  border: 1px solid rgba(230,126,34,0.2);
+}
+body.dark-mode .memory-pill.processing { background: rgba(61,122,138,0.18); }
+body.dark-mode .memory-pill.ok         { background: rgba(107,143,113,0.15); }
+body.dark-mode .memory-pill.error      { background: rgba(230,126,34,0.12); }
+
 /* ─── BOTÓN GUARDAR SESIÓN ───────────────────── */
 .btn-save-session {
   display: inline-flex; align-items: center; gap: 5px;
@@ -3010,6 +3043,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <button class="pro-tab" onclick="switchProTab('classroom')" id="tab-classroom" style="display:none;"><i class="fas fa-users-viewfinder"></i> Observación grupal</button>
       <button class="pro-tab" onclick="switchProTab('parent')" id="tab-parent" style="display:none;"><i class="fas fa-people-arrows"></i> Guía familiar</button>
       <button class="pro-tab" onclick="switchProTab('resources')" id="tab-resources"><i class="fas fa-link"></i> Recursos</button>
+      <button class="pro-tab" onclick="switchProTab('crisis-log')" id="tab-crisis-log"><i class="fas fa-triangle-exclamation"></i> Eventos de crisis</button>
     </div>
 
     <!-- TAB: ANÁLISIS -->
@@ -3250,6 +3284,28 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       </div>
     </div>
 
+    <!-- TAB: EVENTOS DE CRISIS -->
+    <div class="pro-tab-panel" id="panel-crisis-log">
+      <div class="checklist-card" style="margin-top:0;">
+        <h4><i class="fas fa-triangle-exclamation" style="color:var(--red-alert);"></i> Registro anónimo de eventos de crisis</h4>
+        <p style="font-size:0.85rem;color:#aaa;margin-bottom:16px;line-height:1.6;">
+          Muestra las sesiones donde se activó el modo crisis (automáticamente por Aura o manualmente por el usuario).
+          Los datos son anónimos: no incluyen nombre ni IP, solo perfil, fecha y un fragmento del último mensaje.
+          Se conservan 90 días.
+        </p>
+        <button onclick="loadCrisisLogs()"
+          style="background:linear-gradient(135deg,#c0392b,#e74c3c);border:none;
+          border-radius:10px;padding:9px 20px;color:white;font-size:0.85rem;
+          font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;
+          display:flex;align-items:center;gap:7px;margin-bottom:16px;">
+          <i class="fas fa-rotate" id="crisis-log-refresh-icon"></i> Cargar eventos
+        </button>
+        <div id="crisis-log-container">
+          <p style="color:#666;font-size:0.83rem;">Pulsa "Cargar eventos" para ver el registro.</p>
+        </div>
+      </div>
+    </div>
+
   </div></div>
 
 <!-- ══════════════════════════════════════════════
@@ -3267,6 +3323,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <span class="session-saved-pill" id="session-saved-pill" style="display:none;">
         <i class="fas fa-floppy-disk"></i> Guardado
       </span>
+      <span class="memory-pill" id="memory-pill" style="display:none;" aria-live="polite"></span>
       <button class="btn-save-session" id="btn-save-session" onclick="openSaveConsentModal()" title="Guardar conversación para retomar después" style="display:none;">
         <i class="fas fa-bookmark"></i> Guardar
       </button>
@@ -3294,8 +3351,12 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
 
     <div class="chat-disclaimer">
       <i class="fas fa-shield-heart"></i>
-      <span>Este asistente es un <strong>complemento de orientación</strong>, no reemplaza atención profesional.
-      Si estás en crisis, llama al <strong><a href="tel:8002900024" style="color:var(--gold);font-weight:700;">800 290-0024</a></strong> (CONASAMA, 24 hrs, gratuito) o al <strong><a href="tel:8002222268" style="color:var(--gold);font-weight:700;">DIF 800 222-2268</a></strong>.</span>
+      <span>
+        <strong>Aviso importante:</strong> SentinelCareAI es un complemento de orientación emocional.
+        <strong>No sustituye la atención de un profesional de salud mental.</strong>
+        Si estás en crisis, llama al <strong><a href="tel:8002900024" style="color:var(--gold);font-weight:700;">800 290-0024</a></strong> (CONASAMA, 24 hrs, gratuito)
+        o al <strong><a href="tel:911" style="color:var(--gold);font-weight:700;">911</a></strong>.
+      </span>
     </div>
 
     <div class="chat-messages" id="chat-messages">
@@ -3705,6 +3766,22 @@ async function inferMoodFromChat(userText) {
 }
 
 // ── DARK MODE ──
+// ══════════════════════════════════════════════
+// AVISO LEGAL — primera visita
+// ══════════════════════════════════════════════
+const LEGAL_KEY = 'sentinelLegalAccepted';
+
+function showLegalIfNeeded() {
+  if (localStorage.getItem(LEGAL_KEY) !== '1') {
+    document.getElementById('legal-modal').style.display = 'flex';
+  }
+}
+
+function acceptLegal() {
+  localStorage.setItem(LEGAL_KEY, '1');
+  document.getElementById('legal-modal').style.display = 'none';
+}
+
 function toggleDark() {
   document.body.classList.toggle('dark-mode');
   const isDark = document.body.classList.contains('dark-mode');
@@ -3908,6 +3985,13 @@ window.addEventListener('online',  updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 updateOnlineStatus();
 
+// Mostrar aviso legal en primera visita — esperar a que el DOM esté listo
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', showLegalIfNeeded);
+} else {
+  showLegalIfNeeded();
+}
+
 // Override sendMessage: route to offline engine when disconnected
 const originalSendMessage = sendMessage;
 sendMessage = function() {
@@ -3949,14 +4033,9 @@ function offlineSendMessage() {
 // ACCESO PROFESIONAL — CONTRASEÑA PROTEGIDA
 // ══════════════════════════════════════════════
 
-// Hash de verificación de acceso profesional
-const _PRO_HASH = 'CkS9+Yv1vSwfHz5Y3RINev3FsVzh3fbLPoiAyIdsyv8=';
-let _proProfilePending = null; // 'salud' or 'maestro' waiting after auth
-
-async function _hashPwd(pwd) {
-  const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
-}
+// La contraseña ya NO se verifica en el cliente.
+// El hash vive como secret cifrado en Cloudflare Worker (PRO_PASSWORD_HASH).
+let _proProfilePending = null;
 
 function toggleProAccessEye() {
   const inp  = document.getElementById('pro-access-input');
@@ -3966,12 +4045,12 @@ function toggleProAccessEye() {
 }
 
 async function verifyProAccess() {
-  const inp    = document.getElementById('pro-access-input');
-  const btn    = document.getElementById('pro-access-btn');
-  const label  = document.getElementById('pro-access-btn-label');
-  const icon   = document.getElementById('pro-access-btn-icon');
-  const errEl  = document.getElementById('pro-access-error');
-  const card   = document.querySelector('.pro-access-card');
+  const inp   = document.getElementById('pro-access-input');
+  const btn   = document.getElementById('pro-access-btn');
+  const label = document.getElementById('pro-access-btn-label');
+  const icon  = document.getElementById('pro-access-btn-icon');
+  const errEl = document.getElementById('pro-access-error');
+  const card  = document.querySelector('.pro-access-card');
 
   const pwd = inp.value;
   if (!pwd) { inp.focus(); return; }
@@ -3981,30 +4060,53 @@ async function verifyProAccess() {
   label.textContent = 'Verificando…';
   errEl.classList.remove('show');
 
-  const hash = await _hashPwd(pwd);
+  try {
+    const res  = await fetch(PROXY_BASE_URL + '/verify-pro', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ password: pwd }),
+    });
 
-  if (hash === _PRO_HASH) {
-    icon.className = 'fas fa-check';
-    label.textContent = '¡Acceso concedido!';
-    btn.style.background = 'linear-gradient(90deg, #27ae60, #1e8449)';
-    setTimeout(() => {
-      inp.value = '';
+    if (res.status === 429) {
       btn.disabled = false;
       icon.className = 'fas fa-unlock-alt';
       label.textContent = 'Acceder al panel';
-      btn.style.background = '';
-      // Navigate to professional screen
-      _launchProfessional(_proProfilePending);
-    }, 600);
-  } else {
+      errEl.textContent = 'Demasiados intentos. Espera un minuto.';
+      errEl.classList.add('show');
+      inp.value = ''; inp.focus();
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.ok) {
+      icon.className = 'fas fa-check';
+      label.textContent = '¡Acceso concedido!';
+      btn.style.background = 'linear-gradient(90deg, #27ae60, #1e8449)';
+      setTimeout(() => {
+        inp.value = ''; btn.disabled = false;
+        icon.className = 'fas fa-unlock-alt';
+        label.textContent = 'Acceder al panel';
+        btn.style.background = '';
+        _launchProfessional(_proProfilePending);
+      }, 600);
+    } else {
+      btn.disabled = false;
+      icon.className = 'fas fa-unlock-alt';
+      label.textContent = 'Acceder al panel';
+      errEl.textContent = 'Contraseña incorrecta.';
+      errEl.classList.add('show');
+      card.classList.add('pro-access-shake');
+      card.addEventListener('animationend', () => card.classList.remove('pro-access-shake'), { once: true });
+      inp.value = ''; inp.focus();
+    }
+  } catch(e) {
     btn.disabled = false;
     icon.className = 'fas fa-unlock-alt';
     label.textContent = 'Acceder al panel';
+    errEl.textContent = 'Error de conexión. Verifica tu red e intenta de nuevo.';
     errEl.classList.add('show');
-    card.classList.add('pro-access-shake');
-    card.addEventListener('animationend', () => card.classList.remove('pro-access-shake'), { once: true });
-    inp.value = '';
-    inp.focus();
+    inp.value = ''; inp.focus();
   }
 }
 
@@ -4118,6 +4220,7 @@ function enterApp(profile) {
     }
     setTimeout(updateMoodChart, 100);
     setTimeout(renderMemoryPreview, 150);
+    setTimeout(initMemoryEncryption, 300);
     history.pushState({ screen: 's-personal' }, '');
     window.scrollTo(0, 0);
   }
@@ -4873,6 +4976,86 @@ function switchProTab(name) {
 }
 
 // ══════════════════════════════════════════════
+// PANEL DE LOGS DE CRISIS
+// ══════════════════════════════════════════════
+async function loadCrisisLogs() {
+  var container = document.getElementById('crisis-log-container');
+  var icon      = document.getElementById('crisis-log-refresh-icon');
+  if (!container) return;
+
+  icon.className = 'fas fa-spinner fa-spin';
+  container.innerHTML = '<p style="color:#aaa;font-size:0.83rem;">Cargando…</p>';
+
+  // Pedir contraseña para autenticar al profesional
+  var pwd = prompt('Ingresa tu contraseña profesional para ver los eventos de crisis:');
+  if (!pwd) {
+    icon.className = 'fas fa-rotate';
+    container.innerHTML = '<p style="color:#aaa;font-size:0.83rem;">Cancelado.</p>';
+    return;
+  }
+
+  try {
+    var res  = await fetch(PROXY_BASE_URL + '/crisis-logs', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ password: pwd }),
+    });
+
+    if (res.status === 401) {
+      icon.className = 'fas fa-rotate';
+      container.innerHTML = '<p style="color:#e74c3c;font-size:0.83rem;"><i class="fas fa-lock"></i> Contraseña incorrecta.</p>';
+      return;
+    }
+
+    var data = await res.json();
+    icon.className = 'fas fa-rotate';
+
+    if (!data.logs || data.logs.length === 0) {
+      container.innerHTML = '<p style="color:#aaa;font-size:0.83rem;">No hay eventos registrados aún.</p>';
+      return;
+    }
+
+    var perfilLabels = { joven: 'Joven', adulto: 'Adulto', padre: 'Padre/Madre', desconocido: 'Desconocido' };
+    var activadoLabels = { usuario: 'Botón pánico (usuario)', aura: 'Detección automática (Aura)' };
+
+    var html = '<div style="font-size:0.78rem;color:#aaa;margin-bottom:12px;">'
+      + data.logs.length + ' evento' + (data.logs.length !== 1 ? 's' : '') + ' en los últimos 90 días</div>';
+
+    data.logs.forEach(function(log) {
+      var fecha = new Date(log.timestamp).toLocaleString('es-MX', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+      var activadoColor = log.activado_por === 'usuario' ? '#e67e22' : '#c0392b';
+      html += '<div style="border:1px solid rgba(192,57,43,0.2);border-radius:12px;'
+        + 'padding:12px 16px;margin-bottom:10px;background:rgba(192,57,43,0.04);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+        + '<span style="font-size:0.75rem;font-weight:700;color:' + activadoColor + ';">'
+        + '<i class="fas fa-triangle-exclamation" style="margin-right:4px;"></i>'
+        + (activadoLabels[log.activado_por] || log.activado_por)
+        + '</span>'
+        + '<span style="font-size:0.72rem;color:#888;">' + fecha + '</span>'
+        + '</div>'
+        + '<div style="font-size:0.78rem;color:#bbb;margin-bottom:4px;">'
+        + '<i class="fas fa-user" style="margin-right:4px;color:#777;"></i>'
+        + 'Perfil: ' + (perfilLabels[log.perfil] || log.perfil)
+        + '</div>'
+        + (log.fragmento ? '<div style="font-size:0.78rem;color:#999;font-style:italic;'
+          + 'border-left:2px solid rgba(192,57,43,0.3);padding-left:8px;margin-top:6px;">'
+          + '"' + log.fragmento + (log.fragmento.length >= 120 ? '…' : '') + '"'
+          + '</div>' : '')
+        + '</div>';
+    });
+
+    container.innerHTML = html;
+
+  } catch(e) {
+    icon.className = 'fas fa-rotate';
+    container.innerHTML = '<p style="color:#e74c3c;font-size:0.83rem;">Error de conexión. Verifica tu red.</p>';
+  }
+}
+
+// ══════════════════════════════════════════════
 // COLUMBIA C-SSRS CHECKLIST (for salud)
 // ══════════════════════════════════════════════
 const COLUMBIA_ITEMS = [
@@ -5265,60 +5448,296 @@ CÓMO ACOMPAÑARLOS:
 }
 
 // ══════════════════════════════════════════════
-// MEMORIA PERSISTENTE LOCAL — "Lo que Aura sabe de ti"
+// MEMORIA EMOCIONAL — cifrada con AES-GCM + PBKDF2
 // ──────────────────────────────────────────────
-// Todo se guarda en localStorage. Nunca sale del dispositivo.
+// El perfil emocional se cifra con AES-GCM 256 bits usando una clave
+// derivada del PIN del usuario (PBKDF2-SHA256, 150 000 iteraciones).
+// La clave NUNCA toca localStorage — vive solo en memoria (esta pestaña).
+// localStorage guarda: salt + IV + ciphertext en base64 ('sentinelMemoryEnc').
 //
-// ESTRUCTURA:
-// { nombre, updatedAt, sesiones, datos: [{ categoria, texto, fecha }] }
-//
-// CATEGORÍAS: persona | situacion | emocion | logro | preferencia | otro
+// Modos:
+//   setup   → primera vez: el usuario crea un PIN
+//   unlock  → sesión nueva: ingresa PIN para descifrar
+//   opt-out → usuario que saltó el PIN: texto claro (compatibilidad)
 //
 // FLUJO:
-//   Al iniciar el chat  → buildMemoryContext() inyecta el perfil como system msg
-//   Al salir del chat   → extractAndSaveMemory() extrae lo aprendido (silencioso)
-//   Máximo 40 datos, auto-expiran a los 180 días
+//   enterApp(joven|adulto) → initMemoryEncryption() → modal PIN
+//   Al iniciar chat  → buildMemoryContext() inyecta perfil como contexto
+//   Al salir del chat → extractAndSaveMemory() actualiza y re-cifra
 // ══════════════════════════════════════════════
 
-const MEMORY_KEY = 'sentinelUserMemory';
+const MEMORY_KEY     = 'sentinelUserMemory';   // legacy — solo para migrar
+const MEMORY_ENC_KEY = 'sentinelMemoryEnc';    // cifrado: { salt, iv, data }
+const MEMORY_OPT_OUT = 'sentinelMemoryNoPin';  // '1' si el usuario saltó el PIN
 
-function emptyProfile() {
+// Estado de sesión — nunca persiste fuera de esta pestaña
+var _memCryptoKey = null;  // CryptoKey derivada del PIN (null = bloqueado)
+var _memCache     = null;  // perfil descifrado en memoria
+var _pinModalMode = 'setup';
+
+// ── Primitivas criptográficas ──────────────────────────────
+
+async function _memDerive(pin, saltB64) {
+  var enc  = new TextEncoder();
+  var salt = Uint8Array.from(atob(saltB64), function(c){ return c.charCodeAt(0); });
+  var base = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salt, iterations: 150000, hash: 'SHA-256' },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function _memEncrypt(obj, key) {
+  var iv  = crypto.getRandomValues(new Uint8Array(12));
+  var enc = new TextEncoder();
+  var buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(JSON.stringify(obj)));
   return {
-    nombre:        null,
-    sesiones:      0,
-    updatedAt:     null,
-    miedos:        [],
-    inseguridades: [],
-    fortalezas:    [],
-    vinculos:      [],
-    heridas:       [],
-    acompanamiento:[],
-    suenos:        [],
-    triggers:      [],
-    valores:       []
+    iv:   btoa(String.fromCharCode.apply(null, iv)),
+    data: btoa(String.fromCharCode.apply(null, new Uint8Array(buf)))
   };
 }
 
-function loadUserMemory() {
-  try {
-    var raw = localStorage.getItem(MEMORY_KEY);
-    if (!raw) return emptyProfile();
-    var parsed = JSON.parse(raw);
-    var base = emptyProfile();
-    return Object.assign(base, parsed);
-  } catch(e) { return emptyProfile(); }
+async function _memDecrypt(ivB64, dataB64, key) {
+  var iv   = Uint8Array.from(atob(ivB64),   function(c){ return c.charCodeAt(0); });
+  var data = Uint8Array.from(atob(dataB64), function(c){ return c.charCodeAt(0); });
+  var buf  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
+  return JSON.parse(new TextDecoder().decode(buf));
 }
 
-function saveUserMemory(mem) {
-  try { localStorage.setItem(MEMORY_KEY, JSON.stringify(mem)); } catch(e) {}
+// ── Perfil vacío ───────────────────────────────────────────
+
+function emptyProfile() {
+  return {
+    nombre: null, sesiones: 0, updatedAt: null,
+    miedos: [], inseguridades: [], fortalezas: [], vinculos: [],
+    heridas: [], acompanamiento: [], suenos: [], triggers: [], valores: []
+  };
+}
+
+// ── API pública ────────────────────────────────────────────
+
+function loadUserMemory() {
+  // Devuelve el perfil en memoria (descifrado), o vacío si está bloqueado
+  return _memCache ? JSON.parse(JSON.stringify(_memCache)) : emptyProfile();
+}
+
+async function saveUserMemory(mem) {
+  _memCache = mem;
+  try {
+    if (_memCryptoKey) {
+      var stored = JSON.parse(localStorage.getItem(MEMORY_ENC_KEY) || '{}');
+      var enc    = await _memEncrypt(mem, _memCryptoKey);
+      localStorage.setItem(MEMORY_ENC_KEY, JSON.stringify({ salt: stored.salt, iv: enc.iv, data: enc.data }));
+    } else if (localStorage.getItem(MEMORY_OPT_OUT) === '1') {
+      localStorage.setItem(MEMORY_KEY, JSON.stringify(mem));
+    }
+  } catch(e) {}
 }
 
 function clearUserMemory() {
+  _memCache = null;
+  _memCryptoKey = null;
+  localStorage.removeItem(MEMORY_ENC_KEY);
   localStorage.removeItem(MEMORY_KEY);
+  localStorage.removeItem(MEMORY_OPT_OUT);
+}
+
+// ── Modal de PIN ───────────────────────────────────────────
+
+function _showPinModal(mode) {
+  _pinModalMode = mode;
+  var modal     = document.getElementById('pin-modal');
+  var title     = document.getElementById('pin-modal-title');
+  var sub       = document.getElementById('pin-modal-sub');
+  var label     = document.getElementById('pin-submit-label');
+  var icon      = document.getElementById('pin-submit-icon');
+  var confirmW  = document.getElementById('pin-confirm-wrap');
+  var skipBtn   = document.getElementById('pin-skip-btn');
+  var forgotBtn = document.getElementById('pin-forgot-btn');
+
+  document.getElementById('pin-input').value   = '';
+  document.getElementById('pin-confirm').value = '';
+  document.getElementById('pin-error').style.display = 'none';
+  document.getElementById('pin-input').style.borderColor   = 'var(--border)';
+  document.getElementById('pin-confirm').style.borderColor = 'var(--border)';
+
+  if (mode === 'setup') {
+    title.textContent      = 'Protege tu perfil';
+    sub.textContent        = 'Crea un PIN o frase para que solo tú puedas ver lo que Aura recuerda de ti. Solo se usa en este dispositivo.';
+    label.textContent      = 'Crear PIN';
+    icon.className         = 'fas fa-lock';
+    confirmW.style.display = 'block';
+    skipBtn.style.display  = 'inline';
+    forgotBtn.style.display= 'none';
+  } else {
+    title.textContent      = 'Perfil protegido';
+    sub.textContent        = 'Ingresa tu PIN para que Aura recuerde lo que aprendió de ti en sesiones anteriores.';
+    label.textContent      = 'Desbloquear';
+    icon.className         = 'fas fa-unlock-alt';
+    confirmW.style.display = 'none';
+    skipBtn.style.display  = 'none';
+    forgotBtn.style.display= 'inline';
+  }
+
+  modal.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('pin-input').focus(); }, 150);
+}
+
+function _closePinModal() {
+  document.getElementById('pin-modal').style.display = 'none';
+}
+
+function togglePinEye(inputId, iconId) {
+  var inp  = document.getElementById(inputId);
+  var icon = document.getElementById(iconId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  icon.className = inp.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+}
+
+async function submitPin() {
+  var pin    = document.getElementById('pin-input').value;
+  var errEl  = document.getElementById('pin-error');
+  var btn    = document.getElementById('pin-submit-btn');
+  var label  = document.getElementById('pin-submit-label');
+  var icon   = document.getElementById('pin-submit-icon');
+
+  if (!pin || pin.length < 4) {
+    errEl.textContent   = 'El PIN debe tener al menos 4 caracteres.';
+    errEl.style.display = 'block';
+    document.getElementById('pin-input').style.borderColor = 'var(--red-alert)';
+    return;
+  }
+
+  if (_pinModalMode === 'setup') {
+    var confirm = document.getElementById('pin-confirm').value;
+    if (pin !== confirm) {
+      errEl.textContent   = 'Los PINs no coinciden. Intenta de nuevo.';
+      errEl.style.display = 'block';
+      document.getElementById('pin-confirm').style.borderColor = 'var(--red-alert)';
+      document.getElementById('pin-confirm').value = '';
+      document.getElementById('pin-confirm').focus();
+      return;
+    }
+  }
+
+  btn.disabled      = true;
+  icon.className    = 'fas fa-spinner fa-spin';
+  label.textContent = _pinModalMode === 'setup' ? 'Cifrando…' : 'Descifrando…';
+
+  try {
+    if (_pinModalMode === 'setup') {
+      var saltBytes = crypto.getRandomValues(new Uint8Array(16));
+      var saltB64   = btoa(String.fromCharCode.apply(null, saltBytes));
+      _memCryptoKey = await _memDerive(pin, saltB64);
+
+      // Migrar datos en texto claro si existen
+      var profile = emptyProfile();
+      try {
+        var legacy = localStorage.getItem(MEMORY_KEY);
+        if (legacy) profile = Object.assign(emptyProfile(), JSON.parse(legacy));
+      } catch(e) {}
+
+      _memCache = profile;
+      var enc = await _memEncrypt(profile, _memCryptoKey);
+      localStorage.setItem(MEMORY_ENC_KEY, JSON.stringify({ salt: saltB64, iv: enc.iv, data: enc.data }));
+      localStorage.removeItem(MEMORY_KEY);
+      localStorage.removeItem(MEMORY_OPT_OUT);
+
+      icon.className = 'fas fa-check';
+      label.textContent = '¡Perfil protegido!';
+      btn.style.background = 'linear-gradient(90deg,#27ae60,#1e8449)';
+      setTimeout(function(){
+        _closePinModal();
+        btn.disabled = false; icon.className = 'fas fa-lock';
+        label.textContent = 'Crear PIN'; btn.style.background = '';
+        renderMemoryPreview();
+      }, 700);
+
+    } else {
+      var stored = JSON.parse(localStorage.getItem(MEMORY_ENC_KEY) || 'null');
+      if (!stored || !stored.salt) throw new Error('no_data');
+      var key     = await _memDerive(pin, stored.salt);
+      var profile = await _memDecrypt(stored.iv, stored.data, key);
+      _memCryptoKey = key;
+      _memCache     = profile;
+
+      icon.className = 'fas fa-check';
+      label.textContent = '¡Perfil cargado!';
+      btn.style.background = 'linear-gradient(90deg,#27ae60,#1e8449)';
+      setTimeout(function(){
+        _closePinModal();
+        btn.disabled = false; icon.className = 'fas fa-unlock-alt';
+        label.textContent = 'Desbloquear'; btn.style.background = '';
+        renderMemoryPreview();
+        updateMoodChart();
+      }, 700);
+    }
+  } catch(e) {
+    btn.disabled      = false;
+    icon.className    = _pinModalMode === 'setup' ? 'fas fa-lock' : 'fas fa-unlock-alt';
+    label.textContent = _pinModalMode === 'setup' ? 'Crear PIN' : 'Desbloquear';
+    errEl.textContent = e.message === 'no_data'
+      ? 'No se encontró un perfil guardado.'
+      : (_pinModalMode === 'unlock' ? 'PIN incorrecto. Intenta de nuevo.' : 'Error al cifrar. Intenta de nuevo.');
+    errEl.style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').style.borderColor = 'var(--red-alert)';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+function skipPinSetup() {
+  localStorage.setItem(MEMORY_OPT_OUT, '1');
+  try {
+    var legacy = localStorage.getItem(MEMORY_KEY);
+    _memCache = legacy ? Object.assign(emptyProfile(), JSON.parse(legacy)) : emptyProfile();
+  } catch(e) { _memCache = emptyProfile(); }
+  _closePinModal();
+  renderMemoryPreview();
+}
+
+function forgotPin() {
+  if (!confirm('¿Borrar el perfil emocional guardado?\n\nSi olvidaste tu PIN no es posible recuperar los datos cifrados. Aura empezará desde cero.\n\nEsta acción no se puede deshacer.')) return;
+  clearUserMemory();
+  _closePinModal();
+  renderMemoryPreview();
+}
+
+// ── Inicialización — llamada al entrar al perfil ──────────
+
+function initMemoryEncryption() {
+  var hasEnc    = !!localStorage.getItem(MEMORY_ENC_KEY);
+  var hasLegacy = !!localStorage.getItem(MEMORY_KEY);
+  var optedOut  = localStorage.getItem(MEMORY_OPT_OUT) === '1';
+
+  if (optedOut) {
+    try {
+      var raw = localStorage.getItem(MEMORY_KEY);
+      _memCache = raw ? Object.assign(emptyProfile(), JSON.parse(raw)) : emptyProfile();
+    } catch(e) { _memCache = emptyProfile(); }
+    return;
+  }
+  if (!hasEnc && !hasLegacy) {
+    // Primera vez: ofrecer crear PIN
+    setTimeout(function(){ _showPinModal('setup'); }, 400);
+    return;
+  }
+  if (hasEnc) {
+    // Datos cifrados → pedir PIN
+    setTimeout(function(){ _showPinModal('unlock'); }, 400);
+    return;
+  }
+  if (hasLegacy) {
+    // Datos en texto claro (versión anterior) → ofrecer migrar
+    setTimeout(function(){ _showPinModal('setup'); }, 400);
+  }
 }
 
 function confirmClearMemory() {
-  if (!confirm('\u00bfBorrar todo lo que Aura recuerda de ti?\n\nEsto no se puede deshacer. La pr\u00f3xima vez que chatees, Aura empezar\u00e1 desde cero.')) return;
+  if (!confirm('¿Borrar todo lo que Aura recuerda de ti?\n\nEsto eliminará también el cifrado. La próxima vez que entres, podrás crear un nuevo PIN.\n\nEsta acción no se puede deshacer.')) return;
   clearUserMemory();
   renderMemoryPreview();
 }
@@ -5529,10 +5948,11 @@ async function extractAndSaveMemory() {
 
   var userPrompt = 'PERFIL ACTUAL:\n' + perfilActual + '\n\nCONVERSACIÓN DE HOY:\n' + conversacion;
 
+  showMemoryPill('processing');
+
   try {
-    // Usamos /extract-memory en lugar de /chat para que el worker
-    // NO reemplace el system prompt con AURA_SYSTEM_PROMPT.
-    // El endpoint dedicado respeta el system prompt de extracción de perfil.
+    // Usamos /extract-memory para que el worker NO reemplace el system prompt
+    // con AURA_SYSTEM_PROMPT — el modelo recibe el prompt de extracción puro.
     var res = await fetch(PROXY_BASE_URL + '/extract-memory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5546,15 +5966,15 @@ async function extractAndSaveMemory() {
         max_tokens: 1200
       })
     });
-    if (!res.ok) return;
+    if (!res.ok) { showMemoryPill('error'); return; }
 
     var data = await res.json();
     var raw  = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    if (!raw) return;
+    if (!raw) { showMemoryPill('error'); return; }
 
     var clean    = raw.replace(/```json|```/g, '').trim();
     var extraido = JSON.parse(clean);
-    if (!extraido || typeof extraido !== 'object') return;
+    if (!extraido || typeof extraido !== 'object') { showMemoryPill('error'); return; }
 
     // Normaliza un array de items del modelo (strings o {texto,fecha})
     // y les asigna la fecha de hoy si vienen como string nuevo
@@ -5580,11 +6000,12 @@ async function extractAndSaveMemory() {
     if (Array.isArray(extraido.valores)        && extraido.valores.length)        mem.valores       = normalizarItems(extraido.valores);
 
     mem.sesiones  = (mem.sesiones || 0) + (extractAndSaveMemory._sessionCounted ? 0 : 1);
-    extractAndSaveMemory._sessionCounted = true; // solo contar una vez por carga de página
+    extractAndSaveMemory._sessionCounted = true;
     mem.updatedAt = new Date().toISOString();
-    saveUserMemory(mem);
+    await saveUserMemory(mem);
+    showMemoryPill('ok');
 
-  } catch(e) { /* fire-and-forget */ }
+  } catch(e) { showMemoryPill('error'); }
 }
 
 let chatHistory = [];
@@ -5677,6 +6098,40 @@ function flashSavedPill() {
     pill.style.display = 'none';
     pill.classList.remove('flash');
   }, 3000);
+}
+
+// ── Indicador visual de extracción de memoria ─────────────
+// state: 'processing' | 'ok' | 'error' | 'hide'
+function showMemoryPill(state) {
+  var pill = document.getElementById('memory-pill');
+  if (!pill) return;
+  clearTimeout(pill._hideTimer);
+
+  if (state === 'hide') {
+    pill.style.display = 'none';
+    return;
+  }
+
+  var content = {
+    processing: '<i class="fas fa-spinner fa-spin" style="font-size:0.65rem;"></i> Procesando…',
+    ok:         '<i class="fas fa-brain"           style="font-size:0.65rem;"></i> Perfil actualizado',
+    error:      '<i class="fas fa-exclamation"     style="font-size:0.65rem;"></i> No se pudo actualizar'
+  };
+
+  pill.className = 'memory-pill ' + state;
+  pill.innerHTML = content[state] || '';
+  pill.style.display = 'inline-flex';
+
+  // El estado 'ok' y 'error' desaparecen solos tras 4 s
+  if (state === 'ok' || state === 'error') {
+    pill._hideTimer = setTimeout(function() {
+      pill.style.opacity = '0';
+      setTimeout(function() {
+        pill.style.display = 'none';
+        pill.style.opacity = '1';
+      }, 400);
+    }, 4000);
+  }
 }
 
 // ── formatRelativeDate: "Hoy", "Ayer", "hace 3 días", "dd/mm/yyyy" ──
@@ -5776,6 +6231,8 @@ function limpiarYReiniciar() {
   container.innerHTML = '';
   chatHistory  = [];
   pendingFiles = [];
+  _ctxSummaryCache    = null; // limpiar cache del resumen de contexto
+  _ctxSummaryAtLength = 0;
   renderFilePreviews();
   // Hide UI elements
   const bar  = document.getElementById('session-restore-bar');
@@ -6288,10 +6745,31 @@ function openCrisisMode() {
   const overlay = document.getElementById('crisis-overlay');
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
-  // Stop any TTS if active
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-  // Trap focus inside overlay
   overlay.focus && overlay.focus();
+  // Log anónimo de crisis (fire-and-forget)
+  logCrisisEvent('usuario');
+}
+
+// Registra el evento de crisis de forma anónima en el worker.
+// Solo se envía: perfil, quién activó (usuario/aura), y un fragmento
+// del último mensaje del usuario (máx 120 chars). Sin nombres ni IPs.
+function logCrisisEvent(activado_por) {
+  if (!navigator.onLine) return;
+  try {
+    var ultimoMensaje = '';
+    var userMsgs = (chatHistory || []).filter(function(m){ return m.role === 'user'; });
+    if (userMsgs.length) ultimoMensaje = (userMsgs[userMsgs.length - 1].text || '').slice(0, 120);
+    fetch(PROXY_BASE_URL + '/log-crisis', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        perfil:       currentProfile || 'desconocido',
+        activado_por: activado_por || 'aura',
+        fragmento:    ultimoMensaje,
+      }),
+    }).catch(function(){});
+  } catch(e) {}
 }
 
 function closeCrisisMode() {
@@ -6313,6 +6791,81 @@ document.addEventListener('keydown', function(e) {
     closeCrisisMode();
   }
 });
+
+// ══════════════════════════════════════════════
+// VENTANA DE CONTEXTO CON RESUMEN COMPRIMIDO
+// ──────────────────────────────────────────────
+// Si el historial supera CONTEXT_WINDOW_THRESHOLD mensajes, se genera
+// un resumen comprimido de los anteriores con el modelo ligero y se
+// envían solo los últimos CONTEXT_WINDOW_RECENT al modelo.
+//
+// El resumen se cachea hasta que el historial crezca más de 4 mensajes
+// desde la última generación (para no regenerar en cada envío).
+// ══════════════════════════════════════════════
+const CONTEXT_WINDOW_THRESHOLD = 20; // mensajes antes de truncar
+const CONTEXT_WINDOW_RECENT    = 14; // mensajes recientes a conservar siempre
+
+var _ctxSummaryCache    = null; // texto del resumen generado
+var _ctxSummaryAtLength = 0;    // longitud del historial cuando se generó
+
+async function buildContextWindow() {
+  // Si el historial está dentro del umbral → enviar todo sin resumen
+  if (chatHistory.length <= CONTEXT_WINDOW_THRESHOLD) {
+    return { summary: null, recent: chatHistory };
+  }
+
+  const older  = chatHistory.slice(0, chatHistory.length - CONTEXT_WINDOW_RECENT);
+  const recent = chatHistory.slice(-CONTEXT_WINDOW_RECENT);
+
+  // Usar cache si el historial no creció más de 4 mensajes desde la última vez
+  if (_ctxSummaryCache && chatHistory.length - _ctxSummaryAtLength < 4) {
+    return { summary: _ctxSummaryCache, recent };
+  }
+
+  // Generar resumen comprimido de los mensajes anteriores
+  const texto = older
+    .filter(function(m) { return m.text && m.text.length > 3; })
+    .map(function(m) { return (m.role === 'user' ? 'Persona: ' : 'Aura: ') + m.text; })
+    .join('\n')
+    .slice(0, 3000);
+
+  if (!texto.trim()) return { summary: null, recent: chatHistory };
+
+  try {
+    const res = await fetch(PROXY_BASE_URL + '/extract-memory', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model:       'llama-3.1-8b-instant', // modelo ligero — solo resume
+        temperature: 0.2,
+        max_tokens:  300,
+        messages: [
+          {
+            role: 'system',
+            content: 'Eres un asistente que resume conversaciones de apoyo emocional de forma concisa. '
+              + 'Resume los temas, emociones y puntos clave mencionados por la persona en 3-5 oraciones. '
+              + 'Escribe en tercera persona ("La persona mencionó..."). '
+              + 'Solo el resumen, sin saludos ni explicaciones.'
+          },
+          { role: 'user', content: 'Resume esta conversación:\n' + texto }
+        ]
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const raw  = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (raw && raw.trim()) {
+        _ctxSummaryCache    = raw.trim();
+        _ctxSummaryAtLength = chatHistory.length;
+        return { summary: _ctxSummaryCache, recent };
+      }
+    }
+  } catch(e) { /* si falla el resumen, enviar todo el historial como fallback */ }
+
+  // Fallback: si el resumen falla, truncar sin resumen
+  return { summary: null, recent };
+}
 
 async function sendMessage() {
   const input = document.getElementById('chat-input');
@@ -6347,7 +6900,19 @@ async function sendMessage() {
   const moodCtx = buildMoodContext();
   if (moodCtx) groqMessages.push({ role: 'system', content: moodCtx });
 
-  chatHistory.forEach(function(m) {
+  // ── Construcción de la ventana de contexto ───────────────
+  // Si el historial es largo, se genera un resumen comprimido de los
+  // mensajes anteriores y se envían solo los más recientes.
+  const { summary, recent } = await buildContextWindow();
+
+  if (summary) {
+    groqMessages.push({
+      role: 'system',
+      content: 'RESUMEN DE LA CONVERSACIÓN ANTERIOR (antes de los mensajes más recientes):\n' + summary
+    });
+  }
+
+  recent.forEach(function(m) {
     groqMessages.push({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text });
   });
 
@@ -6420,6 +6985,8 @@ async function sendMessage() {
         + '<a href="tel:5552598121"><strong>55 5259-8121</strong></a> SAPTEL &nbsp;·&nbsp; '
         + '<a href="tel:8002222268"><strong>800 222-2268</strong></a> DIF';
       bubble.insertBefore(crisisEl, bubble.querySelector('.msg-time'));
+      // Log anónimo cuando Aura detecta riesgo automáticamente
+      logCrisisEvent('aura');
     }
 
     // Historial, TTS, mood
@@ -6455,6 +7022,168 @@ async function sendMessage() {
   <span class="panic-icon"><i class="fas fa-phone-volume"></i></span>
   <span class="panic-label">Necesito ayuda ahora</span>
 </button>
+
+<!-- ══════════════════════════════════════════════
+     MODAL AVISO LEGAL — primera visita
+═══════════════════════════════════════════════ -->
+<div id="legal-modal" role="dialog" aria-modal="true" aria-labelledby="legal-modal-title"
+  style="display:none;position:fixed;inset:0;z-index:10600;
+  background:rgba(0,0,0,0.65);backdrop-filter:blur(10px);
+  align-items:flex-end;justify-content:center;padding:0;
+  ">
+  <!-- Sheet móvil: sube desde abajo, max-height para que quepa en pantalla pequeña -->
+  <div style="background:var(--card-bg);border:1px solid var(--border);
+    border-radius:24px 24px 0 0;padding:24px 22px 32px;
+    max-width:520px;width:100%;
+    box-shadow:0 -8px 40px rgba(0,0,0,0.25);
+    animation:slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-height:92dvh;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;">
+
+    <!-- Handle visual -->
+    <div style="width:36px;height:4px;border-radius:2px;
+      background:var(--border);margin:0 auto 18px;"></div>
+
+    <!-- Encabezado compacto -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div style="width:40px;height:40px;border-radius:50%;flex-shrink:0;
+        background:linear-gradient(135deg,var(--teal),var(--sage));
+        display:flex;align-items:center;justify-content:center;font-size:18px;">⚖️</div>
+      <h2 id="legal-modal-title" style="font-family:'Playfair Display',serif;
+        font-size:1.1rem;font-weight:700;color:var(--text-dark);margin:0;">
+        Antes de comenzar
+      </h2>
+    </div>
+
+    <!-- Cuerpo compacto -->
+    <div style="font-size:0.83rem;color:var(--text-mid);line-height:1.6;margin-bottom:16px;">
+      <p style="margin-bottom:8px;">
+        <strong style="color:var(--text-dark);">SentinelCareAI no es un servicio médico.</strong>
+        Aura es una IA de acompañamiento emocional — <strong>no sustituye a un profesional de salud mental.</strong>
+      </p>
+
+      <!-- Líneas de crisis compactas -->
+      <div style="background:rgba(192,57,43,0.07);border:1px solid rgba(192,57,43,0.18);
+        border-radius:10px;padding:10px 13px;margin-bottom:8px;">
+        <div style="font-weight:700;color:var(--red-alert);font-size:0.72rem;
+          text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">
+          📞 Crisis — gratuitas 24 hrs
+        </div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:0.8rem;">
+          <a href="tel:8002900024" style="color:var(--red-alert);font-weight:700;white-space:nowrap;">800 290-0024</a><span style="color:var(--text-mid);">CONASAMA · Línea de la Vida</span>
+          <a href="tel:5552598121" style="color:var(--red-alert);font-weight:700;white-space:nowrap;">55 5259-8121</a><span style="color:var(--text-mid);">SAPTEL · Apoyo emocional</span>
+          <a href="tel:911"        style="color:var(--red-alert);font-weight:700;">911</a><span style="color:var(--text-mid);">Emergencias</span>
+        </div>
+      </div>
+
+      <p style="font-size:0.76rem;color:var(--text-light);">
+        Al continuar confirmas que entiendes que este servicio es de orientación emocional, no de diagnóstico ni tratamiento clínico.
+      </p>
+    </div>
+
+    <button onclick="acceptLegal()"
+      style="width:100%;padding:12px;background:linear-gradient(135deg,var(--sage),var(--teal));
+      color:white;border:none;border-radius:12px;font-size:0.92rem;font-weight:600;
+      cursor:pointer;font-family:'DM Sans',sans-serif;
+      box-shadow:0 4px 14px rgba(61,122,138,0.28);transition:opacity 0.2s;">
+      <i class="fas fa-check" style="margin-right:6px;"></i>Entendido, continuar
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL DE PIN — protección del perfil emocional
+═══════════════════════════════════════════════ -->
+<div id="pin-modal" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title"
+  style="display:none;position:fixed;inset:0;z-index:10500;
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);
+  align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--card-bg);border:1px solid var(--border);
+    border-radius:26px;padding:44px 36px 36px;max-width:420px;width:100%;
+    box-shadow:var(--shadow-hover);animation:fadeIn 0.3s ease;text-align:center;">
+
+    <div style="width:68px;height:68px;border-radius:50%;
+      background:linear-gradient(135deg,var(--sage),var(--teal));
+      display:flex;align-items:center;justify-content:center;
+      margin:0 auto 20px;font-size:26px;
+      box-shadow:0 8px 24px rgba(61,122,138,0.3);">🔒</div>
+
+    <h2 id="pin-modal-title" style="font-family:'Playfair Display',serif;
+      font-size:1.4rem;font-weight:700;color:var(--text-dark);margin-bottom:8px;">
+      Protege tu perfil
+    </h2>
+    <p id="pin-modal-sub" style="font-size:0.88rem;color:var(--text-mid);
+      line-height:1.65;margin-bottom:24px;max-width:320px;margin-left:auto;margin-right:auto;">
+    </p>
+
+    <!-- Campo PIN -->
+    <div style="position:relative;margin-bottom:12px;">
+      <input id="pin-input" type="password" placeholder="PIN o frase (mín. 4 caracteres)"
+        autocomplete="current-password"
+        style="width:100%;padding:13px 46px 13px 16px;border:1.5px solid var(--border);
+        border-radius:12px;font-size:0.95rem;font-family:'DM Sans',sans-serif;
+        background:var(--warm-white);color:var(--text-dark);outline:none;
+        transition:border-color 0.2s;box-sizing:border-box;"
+        oninput="this.style.borderColor='var(--border)';document.getElementById('pin-error').style.display='none';"
+        onkeydown="if(event.key==='Enter')submitPin()">
+      <button onclick="togglePinEye('pin-input','pin-eye')"
+        style="position:absolute;right:13px;top:50%;transform:translateY(-50%);
+        background:none;border:none;cursor:pointer;color:var(--text-light);font-size:0.9rem;padding:4px;">
+        <i id="pin-eye" class="fas fa-eye"></i>
+      </button>
+    </div>
+
+    <!-- Campo confirmar (solo en setup) -->
+    <div id="pin-confirm-wrap" style="position:relative;margin-bottom:16px;display:none;">
+      <input id="pin-confirm" type="password" placeholder="Confirmar PIN"
+        autocomplete="new-password"
+        style="width:100%;padding:13px 46px 13px 16px;border:1.5px solid var(--border);
+        border-radius:12px;font-size:0.95rem;font-family:'DM Sans',sans-serif;
+        background:var(--warm-white);color:var(--text-dark);outline:none;
+        transition:border-color 0.2s;box-sizing:border-box;"
+        oninput="this.style.borderColor='var(--border)';document.getElementById('pin-error').style.display='none';"
+        onkeydown="if(event.key==='Enter')submitPin()">
+      <button onclick="togglePinEye('pin-confirm','pin-eye2')"
+        style="position:absolute;right:13px;top:50%;transform:translateY(-50%);
+        background:none;border:none;cursor:pointer;color:var(--text-light);font-size:0.9rem;padding:4px;">
+        <i id="pin-eye2" class="fas fa-eye"></i>
+      </button>
+    </div>
+
+    <!-- Error -->
+    <div id="pin-error" style="display:none;color:var(--red-alert);font-size:0.82rem;
+      margin-bottom:12px;padding:9px 14px;background:rgba(192,57,43,0.08);
+      border:1px solid rgba(192,57,43,0.18);border-radius:9px;text-align:left;">
+    </div>
+
+    <!-- Botón principal -->
+    <button id="pin-submit-btn" onclick="submitPin()"
+      style="width:100%;padding:13px;background:linear-gradient(135deg,var(--sage),var(--teal));
+      color:white;border:none;border-radius:13px;font-size:0.95rem;font-weight:600;
+      cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:12px;
+      transition:opacity 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;">
+      <i id="pin-submit-icon" class="fas fa-lock"></i>
+      <span id="pin-submit-label">Crear PIN</span>
+    </button>
+
+    <!-- Acciones secundarias -->
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <button id="pin-skip-btn" onclick="skipPinSetup()"
+        style="background:none;border:none;color:var(--text-light);font-size:0.8rem;
+        cursor:pointer;font-family:'DM Sans',sans-serif;padding:5px;transition:color 0.2s;"
+        onmouseover="this.style.color='var(--text-mid)'" onmouseout="this.style.color='var(--text-light)'">
+        Saltar por ahora (sin protección)
+      </button>
+      <button id="pin-forgot-btn" onclick="forgotPin()"
+        style="display:none;background:none;border:none;color:var(--red-alert);font-size:0.8rem;
+        cursor:pointer;font-family:'DM Sans',sans-serif;padding:5px;opacity:0.75;transition:opacity 0.2s;"
+        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.75'">
+        <i class="fas fa-trash-can" style="margin-right:4px;"></i>Olvidé mi PIN — borrar perfil
+      </button>
+    </div>
+
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════
      CRISIS OVERLAY — PANTALLA COMPLETA

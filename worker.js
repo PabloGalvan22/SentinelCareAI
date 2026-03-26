@@ -340,12 +340,29 @@ export default {
         ...safe.messages
       ];
 
-      // ── Llamada a Groq con fallback de modelo ────────────
-      // Intenta con el modelo seleccionado. Si Groq responde con un error
-      // de servidor (5xx) o la red falla, reintenta automáticamente con
-      // FALLBACK_MODEL antes de devolver error al usuario.
-      const isStream = safe.stream === true;
+      // ── Llamada a Groq con backoff exponencial + fallback de modelo ──
+      //
+      // ESTRATEGIA:
+      //   1. Intenta con el modelo primario hasta MAX_RETRIES veces.
+      //      - 429 (rate limit Groq) → espera Retry-After o backoff, reintenta.
+      //      - 503 / 5xx            → backoff, reintenta.
+      //      - Error de red         → backoff, reintenta.
+      //   2. Si se agotan los reintentos o sigue fallando → fallback a FALLBACK_MODEL
+      //      con la misma lógica de backoff.
+      //   3. Si el fallback también falla → error al usuario.
+      //
+      // NOTA STREAMING: no se puede reintentar un stream a medias.
+      // Para stream=true se hace un solo intento; si falla se cae directo
+      // al fallback (sin backoff) para no dejar al usuario esperando.
 
+      const isStream   = safe.stream === true;
+      const MAX_RETRIES = 3;                      // intentos por modelo
+      const BASE_DELAY  = 1000;                   // ms — se duplica cada intento
+
+      // Espera ms milisegundos (respetando el límite de 10 s para no agotar el worker)
+      const sleep = ms => new Promise(r => setTimeout(r, Math.min(ms, 10000)));
+
+      // Un solo fetch a Groq con el modelo indicado
       async function fetchGroq(model) {
         const payload = { ...safe, model };
         return fetch(GROQ_CHAT_URL, {
@@ -355,29 +372,94 @@ export default {
         });
       }
 
-      let groqRes;
-      try {
-        groqRes = await fetchGroq(safe.model);
-        // Si el modelo primario devuelve error de servidor, probamos el fallback
-        if (!groqRes.ok && groqRes.status >= 500 && safe.model !== FALLBACK_MODEL) {
-          console.warn(`[Groq] ${safe.model} → ${groqRes.status}. Reintentando con ${FALLBACK_MODEL}.`);
-          logError(env, { type: 'groq_5xx_fallback', model: safe.model, status: groqRes.status, ip });
-          groqRes = await fetchGroq(FALLBACK_MODEL);
-        }
-      } catch (networkErr) {
-        // Error de red en el modelo primario → intentar con fallback
-        if (safe.model !== FALLBACK_MODEL) {
-          console.warn(`[Groq] Red falló con ${safe.model}. Reintentando con ${FALLBACK_MODEL}.`);
-          logError(env, { type: 'groq_network_fallback', model: safe.model, detail: networkErr.message, ip });
+      // Fetch con backoff: reintenta en 429 / 5xx / red hasta maxRetries veces.
+      // Devuelve { res } si tuvo éxito, o lanza el último error si agotó intentos.
+      async function fetchGroqWithBackoff(model, maxRetries) {
+        let lastErr;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
+            const res = await fetchGroq(model);
+
+            // Éxito o error de cliente (4xx salvo 429) → devolver sin reintentar
+            if (res.ok || (res.status < 500 && res.status !== 429)) return res;
+
+            // 429: respetar Retry-After si Groq lo manda, si no usar backoff
+            if (res.status === 429) {
+              const retryAfter = parseInt(res.headers.get('Retry-After') || '0', 10);
+              const wait = retryAfter > 0 ? retryAfter * 1000 : BASE_DELAY * Math.pow(2, attempt);
+              console.warn(`[Groq] 429 en ${model} (intento ${attempt + 1}). Esperando ${wait}ms.`);
+              logError(env, { type: 'groq_429', model, attempt, wait, ip });
+              if (attempt < maxRetries - 1) await sleep(wait);
+              lastErr = res;
+              continue;
+            }
+
+            // 5xx: backoff exponencial
+            const wait = BASE_DELAY * Math.pow(2, attempt);
+            console.warn(`[Groq] ${res.status} en ${model} (intento ${attempt + 1}). Esperando ${wait}ms.`);
+            logError(env, { type: 'groq_5xx', model, status: res.status, attempt, ip });
+            if (attempt < maxRetries - 1) await sleep(wait);
+            lastErr = res;
+
+          } catch (networkErr) {
+            // Error de red: backoff exponencial
+            const wait = BASE_DELAY * Math.pow(2, attempt);
+            console.warn(`[Groq] Red falló con ${model} (intento ${attempt + 1}): ${networkErr.message}. Esperando ${wait}ms.`);
+            logError(env, { type: 'groq_network', model, attempt, detail: networkErr.message, ip });
+            if (attempt < maxRetries - 1) await sleep(wait);
+            lastErr = networkErr;
+          }
+        }
+        throw lastErr; // agotados los intentos
+      }
+
+      let groqRes;
+
+      if (isStream) {
+        // Stream: un intento directo; si falla, cae al fallback sin backoff
+        try {
+          groqRes = await fetchGroq(safe.model);
+          if (!groqRes.ok && safe.model !== FALLBACK_MODEL) {
+            console.warn(`[Groq] Stream falló con ${safe.model} (${groqRes.status}). Usando ${FALLBACK_MODEL}.`);
+            logError(env, { type: 'groq_stream_fallback', model: safe.model, status: groqRes.status, ip });
             groqRes = await fetchGroq(FALLBACK_MODEL);
-          } catch (fallbackErr) {
-            logError(env, { type: 'groq_fallback_failed', model: FALLBACK_MODEL, detail: fallbackErr.message, ip });
+          }
+        } catch (err) {
+          if (safe.model !== FALLBACK_MODEL) {
+            try { groqRes = await fetchGroq(FALLBACK_MODEL); }
+            catch (fb) { return errorResponse('No se pudo conectar con el servicio de IA. Intenta de nuevo.', 503, origin); }
+          } else {
             return errorResponse('No se pudo conectar con el servicio de IA. Intenta de nuevo.', 503, origin);
           }
-        } else {
-          logError(env, { type: 'groq_network_error', model: safe.model, detail: networkErr.message, ip });
-          return errorResponse('No se pudo conectar con el servicio de IA. Intenta de nuevo.', 503, origin);
+        }
+      } else {
+        // No-stream: backoff completo en modelo primario, luego fallback con backoff
+        try {
+          groqRes = await fetchGroqWithBackoff(safe.model, MAX_RETRIES);
+          // Si después del backoff el primario sigue mal → fallback
+          if (!groqRes.ok && safe.model !== FALLBACK_MODEL) {
+            console.warn(`[Groq] Primario agotado. Usando fallback ${FALLBACK_MODEL}.`);
+            logError(env, { type: 'groq_fallback_after_backoff', model: safe.model, status: groqRes.status, ip });
+            try {
+              groqRes = await fetchGroqWithBackoff(FALLBACK_MODEL, MAX_RETRIES);
+            } catch (fbErr) {
+              logError(env, { type: 'groq_fallback_exhausted', model: FALLBACK_MODEL, ip });
+              return errorResponse('El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.', 503, origin);
+            }
+          }
+        } catch (primaryErr) {
+          if (safe.model !== FALLBACK_MODEL) {
+            console.warn(`[Groq] Primario lanzó error. Usando fallback ${FALLBACK_MODEL}.`);
+            try {
+              groqRes = await fetchGroqWithBackoff(FALLBACK_MODEL, MAX_RETRIES);
+            } catch (fbErr) {
+              logError(env, { type: 'groq_fallback_exhausted', model: FALLBACK_MODEL, ip });
+              return errorResponse('El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.', 503, origin);
+            }
+          } else {
+            logError(env, { type: 'groq_exhausted', model: safe.model, ip });
+            return errorResponse('El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.', 503, origin);
+          }
         }
       }
 
@@ -421,12 +503,9 @@ export default {
       return jsonResponse(data, groqRes.status, origin);
     }
 
-    // ── /extract-memory ───────────────────────────────────
-    // Endpoint exclusivo para la extracción de perfil emocional.
-    // A diferencia de /chat, NO inyecta AURA_SYSTEM_PROMPT:
+    // ── /extract-memory ───────────────────────────────
+    // Extracción de perfil emocional. NO inyecta AURA_SYSTEM_PROMPT —
     // el system prompt de análisis viene del cliente y se respeta tal cual.
-    // Esto evita que el modelo responda como terapeuta en lugar de
-    // devolver el JSON de perfil que buildMemoryContext() espera.
     if (url.pathname === '/extract-memory') {
       let body;
       try {
@@ -439,7 +518,6 @@ export default {
         return errorResponse('El campo "messages" es obligatorio y debe ser un array no vacío.', 400, origin);
       }
 
-      // Validación idéntica a /chat para consistencia y seguridad
       const userMsgs = body.messages.filter(m => m.role !== 'system');
       if (userMsgs.length > MSG_MAX_COUNT) {
         return errorResponse(`Demasiados mensajes. Máximo permitido: ${MSG_MAX_COUNT}.`, 400, origin);
@@ -453,15 +531,11 @@ export default {
         }
       }
 
-      const ALLOWED_MODELS = [
-        'llama-3.3-70b-versatile',
-        'llama-3.1-8b-instant',
-      ];
-
+      const ALLOWED_MODELS_MEM = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
       const safe = {
-        model:       ALLOWED_MODELS.includes(body.model) ? body.model : 'llama-3.3-70b-versatile',
-        messages:    body.messages, // se pasan tal cual — sin inyectar AURA_SYSTEM_PROMPT
-        temperature: Math.min(Math.max(body.temperature ?? 0.1, 0), 0.5), // rango más estricto: extracción debe ser determinista
+        model:       ALLOWED_MODELS_MEM.includes(body.model) ? body.model : 'llama-3.3-70b-versatile',
+        messages:    body.messages,
+        temperature: Math.min(Math.max(body.temperature ?? 0.1, 0), 0.5),
         max_tokens:  Math.min(Math.max(body.max_tokens  ?? 1200, 1), 1500),
       };
 
@@ -473,7 +547,6 @@ export default {
           body:    JSON.stringify(safe),
         });
         if (!groqRes.ok && groqRes.status >= 500) {
-          // Fallback al modelo ligero
           const fallback = { ...safe, model: 'llama-3.1-8b-instant' };
           groqRes = await fetch(GROQ_CHAT_URL, {
             method: 'POST',
@@ -490,6 +563,137 @@ export default {
       return jsonResponse(data, groqRes.status, origin);
     }
 
-    return errorResponse('Ruta no encontrada. Usa /chat, /transcribe o /extract-memory', 404, origin);
+    // ── /verify-pro ───────────────────────────────────
+    // Valida la contraseña del modo profesional server-side.
+    // El hash NUNCA viaja al cliente — vive como secret cifrado en Cloudflare.
+    //
+    // CONFIGURAR (una sola vez):
+    //   node -e "const c=require('crypto');process.stdout.write(c.createHash('sha256').update('TU_CONTRASEÑA').digest('base64'))"
+    //   wrangler secret put PRO_PASSWORD_HASH   ← pega el output anterior
+    //
+    // Rate limit propio: máx 5 intentos por minuto por IP (anti-fuerza bruta).
+    if (url.pathname === '/verify-pro') {
+      if (!env.PRO_PASSWORD_HASH) {
+        console.error('PRO_PASSWORD_HASH secret not set');
+        return errorResponse('Proxy mal configurado — falta PRO_PASSWORD_HASH', 500, origin);
+      }
+
+      // Rate limit más estricto para este endpoint: 5 intentos por minuto por IP
+      const proKey = `rl:pro:${ip}`;
+      let proBlocked = false;
+      if (env.RATE_LIMIT_KV) {
+        try {
+          const now   = Date.now();
+          const raw   = await env.RATE_LIMIT_KV.get(proKey, { type: 'json' });
+          const entry = raw || { count: 0, start: now };
+          if (now - entry.start > RL_WINDOW_MS) { entry.count = 0; entry.start = now; }
+          entry.count++;
+          await env.RATE_LIMIT_KV.put(proKey, JSON.stringify(entry), { expirationTtl: Math.ceil(RL_WINDOW_MS / 1000) });
+          if (entry.count > 5) proBlocked = true;
+        } catch (e) { /* KV falló — permitimos el intento */ }
+      }
+      if (proBlocked) {
+        return errorResponse('Demasiados intentos. Espera un minuto e inténtalo de nuevo.', 429, origin);
+      }
+
+      let body;
+      try { body = await request.json(); } catch {
+        return errorResponse('JSON inválido', 400, origin);
+      }
+
+      const pwd = typeof body.password === 'string' ? body.password : '';
+      if (!pwd) return errorResponse('Contraseña requerida.', 400, origin);
+
+      // Hashear la contraseña recibida con SHA-256
+      const encoder = new TextEncoder();
+      const hashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(pwd));
+      const hashB64 = btoa(String.fromCharCode(...new Uint8Array(hashBuf)));
+
+      // Comparación en tiempo constante para prevenir timing attacks.
+      // Simulamos timingSafeEqual con XOR byte a byte.
+      const a    = encoder.encode(hashB64);
+      const b    = encoder.encode(env.PRO_PASSWORD_HASH);
+      let   diff = a.length ^ b.length; // 0 si las longitudes coinciden
+      const len  = Math.min(a.length, b.length);
+      for (let i = 0; i < len; i++) diff |= a[i] ^ b[i];
+      const ok = diff === 0;
+
+      // Siempre mismo status 200 — no filtramos info por status code
+      return jsonResponse({ ok }, 200, origin);
+    }
+
+    // ── /log-crisis ───────────────────────────────────
+    // Registra un evento de crisis de forma anónima en KV.
+    // DATOS: timestamp, perfil, activado_por, fragmento del último mensaje (máx 120 chars).
+    // NO se guarda: nombre, IP ni ningún dato identificable.
+    // TTL: 90 días. Si KV no está disponible el log se descarta silenciosamente.
+    if (url.pathname === '/log-crisis') {
+      let body;
+      try { body = await request.json(); } catch {
+        return errorResponse('JSON inválido', 400, origin);
+      }
+      if (env.RATE_LIMIT_KV) {
+        try {
+          const now   = Date.now();
+          const id    = `crisis:${now}:${Math.random().toString(36).slice(2, 8)}`;
+          const entry = {
+            timestamp:    new Date(now).toISOString(),
+            perfil:       ['joven','adulto','padre'].includes(body.perfil) ? body.perfil : 'desconocido',
+            activado_por: body.activado_por === 'usuario' ? 'usuario' : 'aura',
+            fragmento:    typeof body.fragmento === 'string'
+                            ? body.fragmento.slice(0, 120).replace(/\s+/g, ' ').trim()
+                            : '',
+          };
+          await env.RATE_LIMIT_KV.put(id, JSON.stringify(entry), { expirationTtl: 60 * 60 * 24 * 90 });
+        } catch (e) {
+          console.warn('[log-crisis] KV write failed:', e.message);
+        }
+      }
+      return jsonResponse({ ok: true }, 200, origin);
+    }
+
+    // ── /crisis-logs ──────────────────────────────────
+    // Devuelve los eventos de crisis registrados.
+    // Protegido con la misma contraseña del modo profesional (PRO_PASSWORD_HASH).
+    if (url.pathname === '/crisis-logs') {
+      if (!env.PRO_PASSWORD_HASH) {
+        return errorResponse('Proxy mal configurado — falta PRO_PASSWORD_HASH', 500, origin);
+      }
+      let body;
+      try { body = await request.json(); } catch {
+        return errorResponse('JSON inválido', 400, origin);
+      }
+      // Verificar contraseña — misma lógica en tiempo constante que /verify-pro
+      const enc2    = new TextEncoder();
+      const hBuf    = await crypto.subtle.digest('SHA-256', enc2.encode(body.password || ''));
+      const hB64    = btoa(String.fromCharCode(...new Uint8Array(hBuf)));
+      const ca      = enc2.encode(hB64);
+      const cb      = enc2.encode(env.PRO_PASSWORD_HASH);
+      let   cdiff   = ca.length ^ cb.length;
+      const clen    = Math.min(ca.length, cb.length);
+      for (let i = 0; i < clen; i++) cdiff |= ca[i] ^ cb[i];
+      if (cdiff !== 0) return errorResponse('No autorizado.', 401, origin);
+
+      if (!env.RATE_LIMIT_KV) {
+        return jsonResponse({ logs: [], warning: 'KV no configurado — no hay logs disponibles.' }, 200, origin);
+      }
+      try {
+        const list = await env.RATE_LIMIT_KV.list({ prefix: 'crisis:' });
+        const logs = await Promise.all(
+          list.keys.map(async k => {
+            const raw = await env.RATE_LIMIT_KV.get(k.name);
+            try { return JSON.parse(raw); } catch { return null; }
+          })
+        );
+        const sorted = logs
+          .filter(Boolean)
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        return jsonResponse({ logs: sorted }, 200, origin);
+      } catch (e) {
+        return errorResponse('Error al leer logs.', 500, origin);
+      }
+    }
+
+    return errorResponse('Ruta no encontrada.', 404, origin);
   },
 };

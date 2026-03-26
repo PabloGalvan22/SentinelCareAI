@@ -11,13 +11,16 @@ Plataforma de apoyo emocional y detección de riesgo con inteligencia artificial
 - [Perfiles de usuario](#perfiles-de-usuario)
 - [Módulo de chat — Aura](#módulo-de-chat--aura)
 - [Sistema de memoria emocional](#sistema-de-memoria-emocional)
+- [Ventana de contexto inteligente](#ventana-de-contexto-inteligente)
 - [Rastreador de bienestar](#rastreador-de-bienestar)
 - [Modo Profesional](#modo-profesional)
 - [Modo Padres de Familia](#modo-padres-de-familia)
 - [Modo Crisis](#modo-crisis)
+- [Supervisión clínica](#supervisión-clínica)
+- [Aviso legal](#aviso-legal)
 - [PWA e instalación](#pwa-e-instalación)
 - [Soporte offline](#soporte-offline)
-- [Cloudflare Worker (proxy)](#cloudflare-worker-proxy)
+- [Cloudflare Worker](#cloudflare-worker)
 - [Rate limiting](#rate-limiting)
 - [Seguridad](#seguridad)
 - [Despliegue](#despliegue)
@@ -31,20 +34,24 @@ Plataforma de apoyo emocional y detección de riesgo con inteligencia artificial
 ```
 Navegador (index.html)
     │
-    │  POST /chat             → conversación con Aura (streaming SSE)
-    │  POST /transcribe       → transcripción de voz (Whisper)
-    │  POST /extract-memory   → extracción de perfil emocional (JSON puro)
+    │  POST /chat               → conversación con Aura (streaming SSE)
+    │  POST /transcribe         → transcripción de voz (Whisper)
+    │  POST /extract-memory     → extracción de perfil emocional (JSON puro)
+    │  POST /verify-pro         → validación de contraseña profesional
+    │  POST /log-crisis         → registro anónimo de eventos de crisis
+    │  POST /crisis-logs        → consulta de eventos (panel profesional)
     ▼
 Cloudflare Worker (worker.js)
     │
     │  inyecta AURA_SYSTEM_PROMPT  (solo en /chat)
     │  rate limiting KV + memoria
+    │  backoff exponencial en 429 / 5xx / red
     │  allowlist de modelos y campos
     ▼
 Groq API (Llama 3.3 70B / fallback Llama 3.1 8B)
 ```
 
-El frontend es un **Single-Page Application** puro (HTML + JS vanilla, sin frameworks). Toda la persistencia es `localStorage` del dispositivo del usuario — no hay base de datos ni servidor de sesión.
+El frontend es un **Single-Page Application** puro (HTML + JS vanilla, sin frameworks). Toda la persistencia es `localStorage` del dispositivo — no hay base de datos ni servidor de sesión.
 
 ---
 
@@ -52,12 +59,12 @@ El frontend es un **Single-Page Application** puro (HTML + JS vanilla, sin frame
 
 | Archivo | Descripción |
 |---|---|
-| `index.html` | Aplicación completa (~7 100 líneas). Contiene HTML, CSS y JS. |
-| `worker.js` | Cloudflare Worker: proxy seguro a Groq con rate limiting. |
-| `sw.js` | Service Worker v2: caché PWA, estrategia network-first + offline fallback. |
-| `offline.html` | Pantalla de sin conexión con líneas de crisis disponibles sin internet. |
+| `index.html` | Aplicación completa. HTML, CSS y JS en un solo archivo. |
+| `worker.js` | Cloudflare Worker: proxy seguro a Groq con 6 endpoints. |
+| `sw.js` | Service Worker v2: caché PWA, network-first + offline fallback. |
+| `offline.html` | Pantalla sin conexión con líneas de crisis disponibles sin internet. |
 | `manifest.json` | Manifiesto PWA: iconos, shortcuts, colores, orientación. |
-| `wrangler.toml` | Configuración de despliegue Cloudflare (KV namespace, observabilidad). |
+| `wrangler.toml` | Configuración Cloudflare (KV namespace, observabilidad). |
 | `icon-192.png` | Ícono PWA 192 × 192 px. |
 | `icon-512.png` | Ícono PWA 512 × 512 px. |
 | `favicon.ico` | Favicon del navegador. |
@@ -66,17 +73,15 @@ El frontend es un **Single-Page Application** puro (HTML + JS vanilla, sin frame
 
 ## Perfiles de usuario
 
-La landing presenta cinco perfiles, cada uno con un system prompt y UI adaptados:
-
 | ID | Perfil | Descripción |
 |---|---|---|
 | `joven` | Joven | Apoyo emocional para adolescentes y jóvenes adultos. |
 | `adulto` | Adulto | Acompañamiento para adultos en crisis o malestar emocional. |
-| `salud` | Profesional de salud | Herramientas clínicas. Requiere contraseña. |
-| `maestro` | Maestro / orientador | Herramientas para detección en aula. Requiere contraseña. |
+| `salud` | Profesional de salud | Herramientas clínicas. Requiere contraseña validada server-side. |
+| `maestro` | Maestro / orientador | Herramientas para detección en aula. Requiere contraseña validada server-side. |
 | `padres` | Padres de familia | Guía para identificar señales de riesgo en hijos. |
 
-Los perfiles `salud` y `maestro` pasan por `verifyProAccess()`, que compara un hash SHA-256 de la contraseña ingresada contra `_PRO_HASH` (hardcoded en el cliente — cambiar en producción por validación server-side si se requiere mayor seguridad).
+Los perfiles `salud` y `maestro` llaman al endpoint `/verify-pro` del worker, que compara la contraseña contra `PRO_PASSWORD_HASH` (secret cifrado en Cloudflare) con comparación en tiempo constante (XOR byte a byte) y rate limit de 5 intentos por minuto por IP.
 
 ---
 
@@ -86,47 +91,40 @@ Los perfiles `salud` y `maestro` pasan por `verifyProAccess()`, que compara un h
 
 1. Valida longitud máxima (2 000 caracteres).
 2. Adjunta archivos pendientes (imágenes como base64, texto como contenido).
-3. Infiere el estado de ánimo del mensaje (`inferMoodFromChat`) — llamada ligera al LLM que devuelve un valor 1–5.
-4. Llama a `callGroqStream` (streaming SSE) o `callGroq` (JSON, fallback sin streaming).
-5. Muestra la respuesta token a token con efecto de escritura.
-6. Al completarse: ejecuta `extractAndSaveMemory()` en background.
-7. Detecta palabras de crisis en la respuesta → activa banner o modo crisis completo.
+3. Infiere el estado de ánimo del mensaje (`inferMoodFromChat`).
+4. Construye la ventana de contexto inteligente (`buildContextWindow`).
+5. Llama a `callGroqStream` (streaming SSE) o `callGroq` (JSON, fallback).
+6. Muestra la respuesta token a token con efecto de escritura.
+7. Al completarse: ejecuta `extractAndSaveMemory()` en background y actualiza el pill de memoria.
+8. Detecta palabras de crisis → activa banner o modo crisis + registra evento anónimo.
 
-### Streaming (`callGroqStream`)
+### Streaming
 
-Usa `fetch` + `ReadableStream` para consumir los eventos `data: {...}` de Groq SSE. Cada chunk se parsea y el delta de texto se agrega al burbuja activa del chat. El worker pasa el body del stream directamente al cliente sin buffering (`X-Accel-Buffering: no`).
+Usa `fetch` + `ReadableStream` para consumir eventos `data: {...}` de Groq SSE. El worker pasa el body del stream directamente al cliente sin buffering (`X-Accel-Buffering: no`).
 
 ### Entrada de voz
 
-- Botón de micrófono → `startRecording()` usa `MediaRecorder` con `audio/webm`.
-- Al soltar: `transcribeAudio()` envía el blob como `FormData` al endpoint `/transcribe` del worker.
-- El worker lo reenvía a Groq Whisper (`whisper-large-v3`) y devuelve el texto transcrito.
-- El texto se inserta en el input de chat listo para enviar.
+`startRecording()` usa `MediaRecorder` con `audio/webm`. Al soltar, `transcribeAudio()` envía el blob como `FormData` al endpoint `/transcribe` → Groq Whisper (`whisper-large-v3`).
 
 ### Text-to-Speech (TTS)
 
-- Toggle en la barra inferior del chat.
-- `speakText()` usa la Web Speech API (`speechSynthesis`).
-- Selecciona automáticamente una voz en español si está disponible.
-- `stopTTS()` cancela cualquier utterance en curso (se llama al salir del chat o iniciar nueva conversación).
+Toggle en la barra inferior del chat. `speakText()` usa la Web Speech API con voz en español si está disponible. `stopTTS()` cancela al salir del chat.
 
 ### Adjuntar archivos
 
-- Imágenes: se convierten a base64 y se envían como `image_url` en el mensaje multimodal (requiere modelo con visión: `llama-3.2-11b-vision-preview` o `llama-3.2-90b-vision-preview`).
-- Archivos de texto / PDF: el contenido se extrae y se incluye como texto en el mensaje.
-- Se muestra un chip de preview por cada archivo adjunto con botón de eliminar.
+Imágenes se convierten a base64 y se envían como `image_url` en mensaje multimodal. Archivos de texto / PDF se incluyen como texto en el mensaje.
 
 ### Edición del último mensaje
 
-`editLastMessage()` permite modificar el último mensaje enviado: restaura el texto en el input, elimina el par usuario+IA del historial y del DOM, y vuelve a enviarlo al guardar.
+`editLastMessage()` restaura el texto en el input, elimina el par usuario+IA del historial y del DOM, y permite reenviarlo.
 
 ### Persistencia de sesión (con consentimiento)
 
-El historial **no se guarda automáticamente**. El usuario debe pulsar "Guardar" y aceptar el modal de consentimiento. Se almacena en `localStorage` bajo `sentinelChatSession` con expiración de 7 días y máximo 30 mensajes. El borrado es inmediato desde "Nueva conversación".
+El historial no se guarda automáticamente. El usuario acepta un modal de consentimiento antes de que se escriba cualquier dato. Almacenado en `localStorage` bajo `sentinelChatSession` con expiración de 7 días y máximo 30 mensajes.
 
 ### Exportar chat a PDF
 
-`exportChatPDF()` usa **jsPDF** para generar un PDF con el historial completo de la conversación, incluyendo metadatos de fecha y perfil.
+`exportChatPDF()` usa **jsPDF** para generar un PDF con el historial completo.
 
 ---
 
@@ -134,7 +132,16 @@ El historial **no se guarda automáticamente**. El usuario debe pulsar "Guardar"
 
 ### Propósito
 
-Aura aprende sobre la persona a lo largo de múltiples sesiones. Al terminar cada conversación, un LLM analiza el intercambio y extrae un perfil emocional estructurado guardado en `localStorage`.
+Aura aprende sobre la persona a lo largo de múltiples sesiones. Al terminar cada conversación, un LLM analiza el intercambio y extrae un perfil emocional estructurado. El perfil se **cifra con AES-GCM** — nunca se guarda en texto claro.
+
+### Cifrado (AES-GCM + PBKDF2)
+
+- Primera vez: modal de creación de PIN (mínimo 4 caracteres).
+- Clave derivada con **PBKDF2-SHA256, 150 000 iteraciones**.
+- `localStorage` guarda: `salt + IV + ciphertext` en base64. El PIN nunca persiste.
+- Al volver: modal de desbloqueo. PIN olvidado → opción de borrar perfil.
+- Datos en texto claro existentes se migran automáticamente al cifrado.
+- Opción "Saltar" disponible para mantener compatibilidad sin PIN.
 
 ### Campos del perfil
 
@@ -144,225 +151,230 @@ Aura aprende sobre la persona a lo largo de múltiples sesiones. Al terminar cad
 | `miedos` | Miedos profundos identificados. |
 | `inseguridades` | Inseguridades recurrentes. |
 | `fortalezas` | Capacidades y resiliencia detectadas. |
-| `vinculos` | Personas clave en su vida y la naturaleza del vínculo. |
-| `heridas` | Heridas emocionales o temas que le causan dolor. |
-| `acompanamiento` | Cómo prefiere ser acompañada (necesita escucha, rechaza consejos, etc.). |
-| `suenos` | Sueños y aspiraciones mencionados. |
-| `triggers` | Situaciones que la desestabilizan emocionalmente. |
+| `vinculos` | Personas clave en su vida. |
+| `heridas` | Heridas emocionales o temas dolorosos. |
+| `acompanamiento` | Cómo prefiere ser acompañada. |
+| `suenos` | Sueños y aspiraciones. |
+| `triggers` | Situaciones que la desestabilizan. |
 | `valores` | Valores o creencias que guían sus decisiones. |
 
-Cada item se almacena como `{ texto: string, fecha: "YYYY-MM-DD" }`. Máximo 8 items por campo; si se llena, se reemplaza el más antiguo o superficial.
+Cada item: `{ texto: string, fecha: "YYYY-MM-DD" }`. Máximo 8 items por campo.
 
-### Flujo técnico (`extractAndSaveMemory`)
+### Endpoint `/extract-memory`
 
-1. Solo corre si hay al menos 2 mensajes y hay conexión.
-2. Evita re-extraer si el historial no cambió (hash por longitud + último texto).
-3. Construye un `systemPrompt` con criterios estrictos de qué merece recordarse.
-4. Llama al endpoint **`/extract-memory`** (no `/chat`) para que el worker **no** inyecte `AURA_SYSTEM_PROMPT` — el modelo recibe el prompt de extracción puro y devuelve JSON.
-5. Parsea el JSON, normaliza items (agrega fecha de hoy a strings nuevos), fusiona con el perfil existente y lo guarda.
+`extractAndSaveMemory()` llama a `/extract-memory` (no `/chat`) para que el worker **no** inyecte `AURA_SYSTEM_PROMPT`. El system prompt de extracción llega intacto al modelo y devuelve JSON puro. Temperatura limitada a 0–0.5.
 
-> **Bug corregido:** antes se llamaba a `/chat`, que filtraba el system prompt del cliente y lo reemplazaba con el de Aura. El modelo respondía en lenguaje natural, `JSON.parse` fallaba silenciosamente y el perfil nunca se actualizaba.
+### Indicador visual (memory pill)
 
-### Panel "Lo que Aura recuerda de ti"
+Pill en el header del chat con 3 estados:
+- 🔵 **Procesando…** — spinner mientras el LLM analiza la conversación
+- 🟢 **Perfil actualizado** — desaparece en 4 s
+- 🟠 **No se pudo actualizar** — desaparece en 4 s
 
-`renderMemoryPreview()` muestra el perfil guardado agrupado por campo con íconos y fechas. El usuario puede borrarlo con `confirmClearMemory()`. El panel está en la pantalla de perfil personal (`#s-personal`) y se recarga cada vez que se abre.
+---
 
-### Contexto de memoria en el chat
+## Ventana de contexto inteligente
 
-`buildMemoryContext()` genera un bloque de texto estructurado con el perfil y lo inyecta al inicio del historial de mensajes que se envía a Aura, para que "recuerde" a la persona desde el primer mensaje de cada sesión.
+Cuando el historial supera 20 mensajes, Aura opera con **3 capas de contexto**:
+
+```
+[system: prompt de Aura]               ← identidad y comportamiento
+[system: memoria emocional]            ← quién es la persona (perfil cifrado)
+[system: historial de bienestar]       ← estado emocional reciente
+[system: resumen comprimido]           ← qué pasó antes (generado por LLM)
+[user/assistant: últimos 14 mensajes]  ← hilo inmediato
+```
+
+### Resumen comprimido (`buildContextWindow`)
+
+- Generado con `llama-3.1-8b-instant` (modelo ligero) vía `/extract-memory`.
+- Cacheado hasta que el historial crezca 4 mensajes más — sin llamadas repetidas.
+- Si falla por red: truncado sin resumen como fallback, el chat no se interrumpe.
+- Se limpia al iniciar nueva conversación.
+
+| Situación | Comportamiento |
+|---|---|
+| ≤ 20 mensajes | Historial completo, sin resumen |
+| > 20 mensajes | Resumen comprimido + últimos 14 |
+| Cache válido (< 4 msgs nuevos) | Sin llamada extra al LLM |
+| Fallo de red | Truncado sin resumen (fallback) |
 
 ---
 
 ## Rastreador de bienestar
 
-Panel en la pantalla personal con selector de estado de ánimo (5 niveles: 😔 Muy mal → 😊 Muy bien) y gráfica de línea (Chart.js) de los últimos 15 días.
+Panel en la pantalla personal con selector de 5 estados de ánimo y gráfica de línea (Chart.js) de los últimos 15 días.
 
-- `selectMood(value)` — registra el estado manualmente.
-- `inferMoodFromChat(userText)` — el LLM infiere el estado a partir del mensaje (valor 1–5). Solo sobreescribe si no hay registro manual del día.
-- `updateMoodSourceBadge()` — muestra si el dato del día fue manual o inferido por IA.
-- `buildMoodContext()` — genera un resumen en lenguaje natural del historial emocional de los últimos 14 días para incluirlo como contexto en el chat.
-- Los datos se persisten en `localStorage` bajo `sentinelMoodHistory`.
+- `selectMood(value)` — registro manual.
+- `inferMoodFromChat(userText)` — inferencia automática por LLM (1–5). Solo sobreescribe si no hay registro manual del día.
+- `buildMoodContext()` — resumen en lenguaje natural de los últimos 14 días para inyectar en el chat.
+- Persiste en `localStorage` bajo `sentinelMoodHistory`.
 
 ---
 
 ## Modo Profesional
 
-Disponible para perfiles `salud` (psicólogos, médicos) y `maestro` (orientadores educativos). Protegido por contraseña.
+Contraseña validada server-side vía `/verify-pro` — el hash nunca toca el cliente.
 
 ### Pestaña: Análisis de casos (`salud`)
 
-- Carga archivos CSV, Excel (`.xlsx`), o imágenes con texto (OCR vía Tesseract.js lazy-loaded).
-- `handleProFiles()` detecta el tipo de archivo y lo procesa.
-- Selector de columna para identificar cuál contiene el texto a analizar.
-- `analyzeFile()` clasifica cada caso con expresiones regulares en niveles de riesgo: **Alto**, **Medio**, **Bajo**, **Sin riesgo**.
-- Métricas en tiempo real: total de casos, alertas altas, posibles falsos positivos.
-- Tabla de resultados filtrable con colores por nivel de riesgo.
-- Nube de palabras de los términos más frecuentes (`updateWordCloud`).
-- Gráfica de distribución por nivel (Chart.js doughnut).
-- Exportar resultados a **CSV** o **Excel (.xlsx)**.
+- Carga CSV, Excel, TXT o imágenes (OCR vía Tesseract.js lazy-loaded).
+- Clasificación por expresiones regulares: Alto / Medio / Bajo / Sin riesgo.
+- Validación LLM de casos de alto riesgo en lotes de 15 (`runLLMValidation`).
+- Análisis narrativo del conjunto completo (`runIAAnalysis`).
+- Exportar resultados a CSV o Excel.
+- Nube de palabras y gráfica de distribución (Chart.js doughnut).
 
-### Validación LLM de casos de alto riesgo (`runLLMValidation`)
+### Escala Columbia (C-SSRS)
 
-- Toma los casos clasificados como "Alto" (hasta `LLM_BATCH_SIZE = 15` por lote).
-- Llama al LLM para que evalúe cada caso: confirma o descarta el riesgo con justificación.
-- Muestra en la tabla si el LLM coincide o difiere de la clasificación por reglas.
-- `runIAAnalysis()` genera un análisis narrativo del conjunto completo de casos.
+Checklist de 5 ítems. Calcula nivel de riesgo (Bajo / Moderado / Alto / Crítico) con recomendaciones de acción.
 
-### Escala Columbia (C-SSRS) (`salud`)
+### Factores de riesgo y protección
 
-Checklist de la Columbia Suicide Severity Rating Scale con 5 ítems. `updateColumbiaScore()` calcula el nivel de riesgo (Bajo / Moderado / Alto / Crítico) según los ítems seleccionados y muestra recomendaciones de acción.
+Listas de checkboxes con conteo en tiempo real.
 
-### Factores de riesgo y protección (`salud`)
+### Notas clínicas
 
-Dos listas de checkboxes (factores de riesgo / factores protectores). `toggleCheckFactor()` actualiza el conteo en tiempo real.
-
-### Notas clínicas (`salud`)
-
-`saveNote()` guarda notas de sesión con fecha, nivel de riesgo, plan de acción y seguimiento en `localStorage` (`sentinel_notes`). `renderNotesLog()` muestra el historial. `exportNotes()` genera un PDF con todas las notas.
+Notas de sesión con fecha, nivel de riesgo, plan de acción y seguimiento. Exportables a PDF.
 
 ### Pestaña: Alerta en aula (`maestro`)
 
-Checklist de señales de alerta observables en el aula (conductas, cambios de ánimo, aislamiento, etc.). `updateClassroomScore()` calcula un nivel de preocupación y sugiere el protocolo de acción. `saveStudentNote()` registra observaciones por alumno.
+Checklist de señales observables. Calcula nivel de preocupación y sugiere protocolo. Registro de observaciones por alumno.
+
+### Pestaña: Eventos de crisis
+
+Panel de revisión de logs anónimos. Requiere contraseña profesional. Ver [Supervisión clínica](#supervisión-clínica).
 
 ---
 
 ## Modo Padres de Familia
 
-Pantalla informativa (`#s-padres`) con:
-
-- Señales de alerta organizadas en semáforo (verde / amarillo / rojo).
-- Guía de cómo iniciar una conversación con un hijo.
-- Recursos y líneas de crisis.
-- Acceso al chat con Aura en modo "padre", con un system prompt adaptado para orientar a padres preocupados por sus hijos.
+Pantalla informativa con señales de alerta en semáforo, guía de conversación con hijos, recursos y líneas de crisis. Acceso al chat con Aura en modo orientado a padres.
 
 ---
 
 ## Modo Crisis
 
-Se activa cuando el LLM detecta contenido de riesgo inmediato en la respuesta de Aura.
+Se activa cuando Aura detecta contenido de riesgo o el usuario pulsa el botón de pánico.
 
-- **Banner de crisis**: barra fija en la parte inferior con el número 800 290-0024 (CONASAMA).
-- **Overlay de crisis completo** (`openCrisisMode`): pantalla completa con avatar de Aura, mensaje de contención y tarjetas de teléfonos de emergencia:
+- **Banner inline** con número 800 290-0024 en la burbuja de respuesta.
+- **Overlay completo** con avatar de Aura, mensaje de contención y tarjetas de teléfonos:
   - CONASAMA · Línea de la Vida — 800 290-0024
   - SAPTEL — 55 5259-8121
   - DIF Nacional — 800 222-2268
   - Emergencias — 911
-- `closeCrisisMode()` regresa al chat y empuja un estado al historial del navegador para que el botón "atrás" lo cierre correctamente.
+- Al activarse llama `logCrisisEvent()` — registra el evento de forma anónima en KV.
+
+---
+
+## Supervisión clínica
+
+### Log anónimo de crisis (`/log-crisis`)
+
+| Campo | Descripción |
+|---|---|
+| `timestamp` | Fecha y hora ISO 8601 |
+| `perfil` | joven / adulto / padre / desconocido |
+| `activado_por` | `usuario` (botón pánico) o `aura` (detección automática) |
+| `fragmento` | Últimos 120 chars del mensaje del usuario |
+
+Sin nombre, sin IP, sin datos identificables. TTL de 90 días.
+
+### Panel de revisión (`/crisis-logs`)
+
+Endpoint protegido con `PRO_PASSWORD_HASH`. Muestra todos los eventos ordenados por fecha. Diseñado para revisión periódica por un profesional de salud.
+
+---
+
+## Aviso legal
+
+Modal de bottom sheet que aparece **una sola vez** en la primera visita. Informa que SentinelCareAI no es un servicio médico, no sustituye atención profesional, y muestra las líneas de crisis. Se guarda `sentinelLegalAccepted = '1'` en `localStorage`.
+
+Disclaimer también visible permanentemente en la parte superior del chat.
 
 ---
 
 ## PWA e instalación
 
-La app es una Progressive Web App instalable en Android, iOS y escritorio.
-
-- `manifest.json` define nombre, íconos, colores, orientación y dos shortcuts (Chat de apoyo, Líneas de crisis).
-- El Service Worker (`sw.js`) se registra al cargar y habilita el uso offline.
-- Lógica de instalación en `index.html`:
-  - **Android**: captura `beforeinstallprompt`, muestra banner flotante (`showInstallBanner`).
-  - **iOS**: detecta Safari en iPhone/iPad y muestra instrucciones manuales (Compartir → Añadir a inicio).
-  - **Escritorio**: botón discreto en el header (`_showDesktopInstallBtn`).
-- `installApp()` dispara el prompt nativo o muestra las instrucciones según la plataforma.
+- `manifest.json` define nombre, íconos, colores, orientación y shortcuts.
+- **Android**: captura `beforeinstallprompt`, muestra banner flotante.
+- **iOS**: detecta Safari y muestra instrucciones manuales.
+- **Escritorio**: botón discreto en el header.
 - El banner se descarta por sesión (`sessionStorage`).
 
 ---
 
 ## Soporte offline
 
-El Service Worker (`sw.js`) implementa cuatro estrategias según el tipo de recurso:
-
 | Tipo de request | Estrategia |
 |---|---|
-| Proxy Groq (`sentinel-proxy.*.workers.dev`) | Siempre red — nunca cachear. |
-| CDN externos (fonts, Chart.js, marked…) | Cache-first con actualización en background. |
-| Navegación HTML | Network-first; fallback a `offline.html` si no hay red. |
-| Assets propios (JS/CSS/imágenes) | Stale-while-revalidate. |
+| Proxy Groq | Siempre red — nunca cachear |
+| CDN externos | Cache-first con actualización en background |
+| Navegación HTML | Network-first; fallback a `offline.html` |
+| Assets propios | Stale-while-revalidate |
 
-`offline.html` se **precachea en la instalación** del SW para garantizar que siempre esté disponible. Si el precacheo falla (primer despliegue sin red), el SW devuelve una respuesta HTML mínima inline con los números de crisis.
-
-Al volver online, `updateOnlineStatus()` oculta el banner de sin conexión y reactiva el envío normal.
+`offline.html` se precachea en la instalación del SW e incluye las líneas de crisis disponibles sin internet.
 
 ---
 
-## Cloudflare Worker (proxy)
+## Cloudflare Worker
 
-**Archivo:** `worker.js`  
 **URL base:** `https://sentinel-proxy.sentinelpablo.workers.dev`
 
 ### Endpoints
 
-#### `POST /chat`
-Chat con Aura. El worker:
-1. Filtra todos los mensajes `system` del cliente.
-2. Prepende `AURA_SYSTEM_PROMPT` (desde secret cifrado).
-3. Valida modelo (allowlist), temperatura (0–1.5), max_tokens (1–2 000).
-4. Soporta streaming SSE (`stream: true`).
-5. Fallback automático: si el modelo primario devuelve 5xx o falla la red, reintenta con `llama-3.1-8b-instant`.
+| Endpoint | Descripción |
+|---|---|
+| `POST /chat` | Chat con Aura. Inyecta `AURA_SYSTEM_PROMPT`, streaming SSE, backoff exponencial. |
+| `POST /transcribe` | Reenvía audio a Groq Whisper. |
+| `POST /extract-memory` | Extracción de perfil y resúmenes. No inyecta `AURA_SYSTEM_PROMPT`. Temperatura máx 0.5. |
+| `POST /verify-pro` | Valida contraseña profesional. Timing-safe. Rate limit 5/min por IP. |
+| `POST /log-crisis` | Registra evento de crisis anónimo en KV. Siempre responde 200. |
+| `POST /crisis-logs` | Devuelve eventos de crisis. Requiere contraseña profesional. |
 
-#### `POST /transcribe`
-Transcripción de audio. Reenvía el `FormData` con el audio a Groq Whisper (`whisper-large-v3`) y devuelve el texto.
+### Backoff exponencial
 
-#### `POST /extract-memory`
-Extracción de perfil emocional. **No inyecta `AURA_SYSTEM_PROMPT`**: pasa los mensajes tal cual para que el system prompt de extracción (JSON puro) llegue intacto al modelo. Temperatura limitada a 0–0.5 para resultados deterministas.
+| Error | Comportamiento |
+|---|---|
+| 429 | Respeta `Retry-After` o espera 1s / 2s / 4s hasta 3 intentos |
+| 5xx / 503 | Backoff 1s → 2s → 4s hasta 3 intentos |
+| Error de red | Backoff 1s → 2s → 4s hasta 3 intentos |
+| Primario agotado | Fallback a `llama-3.1-8b-instant` con misma lógica |
+| Fallback agotado | Error claro al usuario |
+| Stream fallido | Fallback directo sin backoff |
 
-### Modelos permitidos
-
-```
-llama-3.3-70b-versatile   ← primario
-llama-3.1-8b-instant      ← fallback
-llama-3.2-11b-vision-preview
-llama-3.2-90b-vision-preview
-mixtral-8x7b-32768
-gemma2-9b-it
-whisper-large-v3
-```
+Espera máxima por intento: 10 s (límite del runtime de Cloudflare Workers).
 
 ---
 
 ## Rate limiting
 
-Implementación híbrida: usa **Cloudflare KV** si el binding `RATE_LIMIT_KV` está configurado; si no, cae a **memoria en proceso** (best-effort, se reinicia con el worker).
-
-| Límite | Valor |
+| Endpoint | Límite |
 |---|---|
-| Por minuto por IP | 30 requests |
-| Por día por IP | 500 requests |
-
-Las claves KV expiran automáticamente (`expirationTtl`). Si KV falla por cualquier razón, el worker continúa usando memoria sin romper el request.
-
-**Para activar KV persistente:**
-```bash
-wrangler kv:namespace create "RATE_LIMIT"
-# Pegar el id devuelto en wrangler.toml → [[kv_namespaces]]
-wrangler deploy
-```
+| `/chat`, `/transcribe`, `/extract-memory` | 30 req/min · 500 req/día por IP |
+| `/verify-pro` | 5 intentos/min por IP |
 
 ---
 
 ## Seguridad
 
-- **CORS estricto**: solo se responde con `Access-Control-Allow-Origin` a orígenes en `ALLOWED_ORIGINS` (localhost, GitHub Pages). Otros orígenes reciben la respuesta sin el header CORS — el navegador la bloquea.
-- **Security headers** en todas las respuestas: `CSP: default-src 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
-- **API key nunca en el cliente**: `GROQ_API_KEY` es un Cloudflare secret cifrado, inaccesible desde el navegador o el repositorio.
-- **System prompt cifrado**: `AURA_SYSTEM_PROMPT` también es un secret — no está en el código fuente ni en los logs.
-- **Allowlist de campos**: el worker solo reenvía a Groq los campos `model`, `messages`, `temperature`, `max_tokens` y `stream`. Cualquier otro campo del cliente se descarta.
-- **Validación de input**: máximo 35 mensajes por request y 8 000 caracteres por mensaje.
-- **DOMPurify**: todo HTML generado por `marked.parse()` (markdown de Aura) se sanitiza antes de inyectarse al DOM.
-- **Error webhook opcional**: si se configura `ERROR_WEBHOOK_URL` (secret), los errores de Groq se envían a Slack/Discord sin bloquear la respuesta al usuario.
+- **CORS estricto**: solo `pablogalvan22.github.io`, `localhost` y `127.0.0.1`.
+- **Security headers**: `CSP: default-src 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+- **API key nunca en el cliente**: `GROQ_API_KEY` es un Cloudflare secret cifrado.
+- **System prompt cifrado**: `AURA_SYSTEM_PROMPT` también es un secret.
+- **Contraseña profesional**: `PRO_PASSWORD_HASH` como secret — comparación en tiempo constante (XOR byte a byte).
+- **Perfil emocional cifrado**: AES-GCM 256 bits, clave derivada por PBKDF2. Solo ciphertext en `localStorage`.
+- **Allowlist de campos**: el worker solo reenvía campos permitidos a Groq.
+- **Validación de input**: máx 35 mensajes por request, 8 000 chars por mensaje.
+- **DOMPurify**: todo HTML de `marked.parse()` se sanitiza antes de inyectarse al DOM.
+- **Log de crisis anónimo**: sin nombre, sin IP, sin datos identificables.
 
 ---
 
 ## Despliegue
 
-### Prerrequisitos
-
-- Cuenta en [Cloudflare](https://cloudflare.com) (plan gratuito es suficiente).
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) instalado.
-- Clave de API de [Groq](https://console.groq.com).
-
-### Pasos
-
 ```bash
-# 1. Instalar Wrangler
+# 1. Instalar Wrangler y autenticar
 npm install -g wrangler
 wrangler login
 
@@ -370,30 +382,19 @@ wrangler login
 wrangler secret put GROQ_API_KEY
 wrangler secret put AURA_SYSTEM_PROMPT
 
-# 3. (Opcional) Activar rate limiting persistente con KV
+# 3. Generar y subir hash de contraseña profesional
+node -e "const c=require('crypto'); process.stdout.write(c.createHash('sha256').update('TU_CONTRASEÑA').digest('base64'))"
+wrangler secret put PRO_PASSWORD_HASH
+
+# 4. (Opcional) Activar KV persistente
 wrangler kv:namespace create "RATE_LIMIT"
 # Copiar el id al campo id en wrangler.toml → [[kv_namespaces]]
 
-# 4. Desplegar el worker
+# 5. Desplegar
 wrangler deploy
 
-# 5. Publicar el frontend
-# Subir index.html, sw.js, offline.html, manifest.json,
-# icon-192.png, icon-512.png, favicon.ico a GitHub Pages
-# (o cualquier hosting estático).
-```
-
-### Actualizaciones posteriores
-
-Solo el archivo modificado necesita actualizarse:
-
-```bash
-# Cambios en el worker
-wrangler deploy
-
-# Cambios en el frontend
-# Subir los archivos modificados a GitHub Pages / hosting estático
-# y hacer bump de CACHE_NAME en sw.js si cambian assets cacheados
+# 6. Publicar frontend en GitHub Pages
+# Subir: index.html, sw.js, offline.html, manifest.json, icon-192.png, icon-512.png, favicon.ico
 ```
 
 ---
@@ -404,8 +405,9 @@ wrangler deploy
 |---|---|---|
 | `GROQ_API_KEY` | Secret Cloudflare | Clave de API de Groq. Nunca en el repositorio. |
 | `AURA_SYSTEM_PROMPT` | Secret Cloudflare | System prompt completo de Aura. Cifrado en Cloudflare. |
-| `ERROR_WEBHOOK_URL` | Secret Cloudflare (opcional) | URL de webhook para recibir alertas de errores de Groq (Slack, Discord, Make). |
-| `RATE_LIMIT_KV` | KV Binding (opcional) | Namespace de Cloudflare KV para rate limiting persistente. |
+| `PRO_PASSWORD_HASH` | Secret Cloudflare | Hash SHA-256 en base64 de la contraseña del modo profesional. |
+| `ERROR_WEBHOOK_URL` | Secret Cloudflare (opcional) | Webhook para alertas de errores (Slack, Discord, Make). |
+| `RATE_LIMIT_KV` | KV Binding (opcional) | Namespace KV para rate limiting persistente y logs de crisis. |
 
 ---
 
@@ -415,18 +417,19 @@ wrangler deploy
 |---|---|
 | HTML / CSS / JS vanilla | Frontend completo — sin frameworks. |
 | [Groq API](https://console.groq.com) | Inferencia LLM (Llama 3.3 70B) y transcripción (Whisper). |
-| [Cloudflare Workers](https://workers.cloudflare.com) | Proxy seguro, rate limiting, gestión de secrets. |
-| [Cloudflare KV](https://developers.cloudflare.com/kv/) | Rate limiting persistente entre instancias del worker. |
-| [Chart.js](https://www.chartjs.org) + chartjs-plugin-datalabels | Gráfica de bienestar emocional y distribución de casos. |
+| [Cloudflare Workers](https://workers.cloudflare.com) | Proxy seguro, rate limiting, secrets, logs de crisis. |
+| [Cloudflare KV](https://developers.cloudflare.com/kv/) | Rate limiting persistente y eventos de crisis. |
+| Web Crypto API | Cifrado AES-GCM del perfil emocional + PBKDF2. |
+| [Chart.js](https://www.chartjs.org) | Gráfica de bienestar y distribución de casos. |
 | [marked.js](https://marked.js.org) | Renderizado de markdown en respuestas de Aura. |
 | [DOMPurify](https://github.com/cure53/DOMPurify) | Sanitización del HTML generado por marked. |
 | [jsPDF](https://github.com/parallax/jsPDF) | Exportación del chat y notas clínicas a PDF. |
-| [SheetJS (xlsx)](https://sheetjs.com) | Lectura de archivos Excel y exportación de resultados. |
-| [Tesseract.js](https://tesseract.projectnaptha.com) | OCR de imágenes en el módulo profesional (lazy-loaded). |
+| [SheetJS (xlsx)](https://sheetjs.com) | Lectura de Excel y exportación de resultados. |
+| [Tesseract.js](https://tesseract.projectnaptha.com) | OCR de imágenes en módulo profesional (lazy-loaded). |
 | Web Speech API | Text-to-Speech de respuestas de Aura. |
 | MediaRecorder API | Captura de audio para entrada de voz. |
 | Service Worker + Cache API | Soporte offline y estrategias de caché PWA. |
 | Web App Manifest | Instalación PWA en Android, iOS y escritorio. |
-| localStorage | Perfil emocional, historial de bienestar, notas clínicas, sesión de chat. |
+| localStorage | Perfil cifrado, bienestar, notas, sesión de chat. |
 | [Playfair Display + DM Sans](https://fonts.google.com) | Tipografía (Google Fonts). |
 | [Font Awesome 6](https://fontawesome.com) | Íconos de interfaz. |
