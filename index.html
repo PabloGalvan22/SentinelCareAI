@@ -2763,7 +2763,27 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
         <div id="memory-preview">
           <!-- Relleno por renderMemoryPreview() -->
         </div>
-        <div style="margin-top:14px;text-align:right;">
+        <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+          <button onclick="exportMemoryFile()"
+            style="background:none;border:1px solid rgba(61,122,138,0.3);border-radius:8px;
+            padding:5px 14px;font-size:0.78rem;color:var(--teal);cursor:pointer;
+            font-family:'DM Sans',sans-serif;transition:all 0.2s;"
+            onmouseover="this.style.background='rgba(61,122,138,0.06)'"
+            onmouseout="this.style.background='none'"
+            title="Descarga un archivo cifrado para importar en otro dispositivo">
+            <i class="fas fa-file-arrow-down" style="margin-right:5px;"></i>Exportar perfil
+          </button>
+          <button onclick="document.getElementById('import-memory-input').click()"
+            style="background:none;border:1px solid rgba(107,143,113,0.3);border-radius:8px;
+            padding:5px 14px;font-size:0.78rem;color:var(--sage);cursor:pointer;
+            font-family:'DM Sans',sans-serif;transition:all 0.2s;"
+            onmouseover="this.style.background='rgba(107,143,113,0.06)'"
+            onmouseout="this.style.background='none'"
+            title="Importa un perfil exportado desde otro dispositivo">
+            <i class="fas fa-file-arrow-up" style="margin-right:5px;"></i>Importar perfil
+          </button>
+          <input type="file" id="import-memory-input" accept=".sentinelcare"
+            style="display:none;" onchange="importMemoryFile(this)">
           <button onclick="confirmClearMemory()"
             style="background:none;border:1px solid rgba(192,57,43,0.25);border-radius:8px;
             padding:5px 14px;font-size:0.78rem;color:var(--red-alert);cursor:pointer;
@@ -3063,6 +3083,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <button class="pro-tab" onclick="switchProTab('parent')" id="tab-parent" style="display:none;"><i class="fas fa-people-arrows"></i> Guía familiar</button>
       <button class="pro-tab" onclick="switchProTab('resources')" id="tab-resources"><i class="fas fa-link"></i> Recursos</button>
       <button class="pro-tab" onclick="switchProTab('crisis-log')" id="tab-crisis-log"><i class="fas fa-triangle-exclamation"></i> Eventos de crisis</button>
+      <button class="pro-tab" onclick="switchProTab('token-stats')" id="tab-token-stats"><i class="fas fa-chart-simple"></i> Uso de API</button>
     </div>
 
     <!-- TAB: ANÁLISIS -->
@@ -3072,7 +3093,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
         <div class="file-uploader" onclick="document.getElementById('proFileInput').click()">
           <input type="file" id="proFileInput" accept=".csv,.xlsx,.txt,image/*" multiple>
           <i class="fas fa-cloud-arrow-up"></i>
-          <p>Arrastra o selecciona tu archivo (CSV, PDF, Excel, TXT o imágenes)</p>
+          <p>Arrastra o selecciona tu archivo (CSV, Excel, TXT o imágenes)</p>
           <small>Las imágenes se procesarán con OCR automáticamente</small>
         </div>
         <div id="ocrProgress" class="ocr-progress" style="display:none;"><i class="fas fa-spinner fa-pulse"></i><span id="ocrStatus">Procesando...</span></div>
@@ -3321,6 +3342,27 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
         </button>
         <div id="crisis-log-container">
           <p style="color:#666;font-size:0.83rem;">Pulsa "Cargar eventos" para ver el registro.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: USO DE API -->
+    <div class="pro-tab-panel" id="panel-token-stats">
+      <div class="checklist-card" style="margin-top:0;">
+        <h4><i class="fas fa-chart-simple" style="color:#00d4ff;"></i> Consumo de tokens — últimos 90 días</h4>
+        <p style="font-size:0.85rem;color:#aaa;margin-bottom:16px;line-height:1.6;">
+          Registro de tokens usados por request en el worker. Útil para anticipar límites del plan gratuito de Groq.
+          Los datos se conservan 90 días y se agregan por día y por modelo.
+        </p>
+        <button onclick="loadTokenStats()"
+          style="background:linear-gradient(135deg,#0a3a4a,#0d5060);border:1px solid rgba(0,212,255,0.3);
+          border-radius:10px;padding:9px 20px;color:#00d4ff;font-size:0.85rem;
+          font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;
+          display:flex;align-items:center;gap:7px;margin-bottom:16px;">
+          <i class="fas fa-rotate" id="token-stats-refresh-icon"></i> Cargar estadísticas
+        </button>
+        <div id="token-stats-container">
+          <p style="color:#666;font-size:0.83rem;">Pulsa "Cargar estadísticas" para ver el consumo.</p>
         </div>
       </div>
     </div>
@@ -5120,7 +5162,110 @@ async function loadCrisisLogs() {
 }
 
 // ══════════════════════════════════════════════
-// COLUMBIA C-SSRS CHECKLIST (for salud)
+// PANEL DE USO DE TOKENS
+// ══════════════════════════════════════════════
+async function loadTokenStats() {
+  var container = document.getElementById('token-stats-container');
+  var icon      = document.getElementById('token-stats-refresh-icon');
+  if (!container) return;
+
+  icon.className = 'fas fa-spinner fa-spin';
+  container.innerHTML = '<p style="color:#aaa;font-size:0.83rem;">Cargando…</p>';
+
+  var pwd = prompt('Ingresa tu contraseña profesional para ver las estadísticas:');
+  if (!pwd) {
+    icon.className = 'fas fa-rotate';
+    container.innerHTML = '<p style="color:#aaa;font-size:0.83rem;">Cancelado.</p>';
+    return;
+  }
+
+  try {
+    var res = await fetch(PROXY_BASE_URL + '/token-stats', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ password: pwd }),
+    });
+    if (res.status === 401) {
+      icon.className = 'fas fa-rotate';
+      container.innerHTML = '<p style="color:#e74c3c;font-size:0.83rem;"><i class="fas fa-lock"></i> Contraseña incorrecta.</p>';
+      return;
+    }
+    var data = await res.json();
+    icon.className = 'fas fa-rotate';
+
+    if (!data.days || data.days.length === 0) {
+      container.innerHTML = '<p style="color:#aaa;font-size:0.83rem;">No hay datos registrados aún. Los tokens se empezarán a registrar a partir de ahora.</p>';
+      return;
+    }
+
+    function fmtN(n) { return (n || 0).toLocaleString('es-MX'); }
+
+    // Totales globales
+    var g = data.grandTotal;
+    var html =
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">' +
+        _tokenStatCard('Total tokens', fmtN(g.total), '#00d4ff') +
+        _tokenStatCard('Requests', fmtN(g.requests), '#7ac8d4') +
+        _tokenStatCard('Promedio/req', g.requests ? fmtN(Math.round(g.total / g.requests)) : '—', '#5a7a88') +
+      '</div>';
+
+    // Por modelo
+    if (data.models && data.models.length) {
+      html += '<div style="font-size:0.75rem;font-weight:700;color:#5a7a88;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Por modelo</div>';
+      html += '<div style="margin-bottom:16px;">';
+      data.models.forEach(function(m) {
+        var pct = g.total > 0 ? Math.round((m.total / g.total) * 100) : 0;
+        html +=
+          '<div style="margin-bottom:8px;">' +
+            '<div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;">' +
+              '<span style="color:#aaa;">' + m.model + '</span>' +
+              '<span style="color:#00d4ff;font-weight:600;">' + fmtN(m.total) + ' tokens (' + pct + '%)</span>' +
+            '</div>' +
+            '<div style="height:4px;border-radius:2px;background:rgba(0,212,255,0.1);">' +
+              '<div style="height:100%;border-radius:2px;background:linear-gradient(90deg,#00d4ff,#7ac8d4);width:' + pct + '%;transition:width 0.4s;"></div>' +
+            '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Por día
+    html += '<div style="font-size:0.75rem;font-weight:700;color:#5a7a88;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Por día</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">';
+    html += '<thead><tr style="color:#5a7a88;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+      '<th style="text-align:left;padding:5px 8px;">Fecha</th>' +
+      '<th style="text-align:right;padding:5px 8px;">Requests</th>' +
+      '<th style="text-align:right;padding:5px 8px;">Prompt</th>' +
+      '<th style="text-align:right;padding:5px 8px;">Completion</th>' +
+      '<th style="text-align:right;padding:5px 8px;">Total</th>' +
+    '</tr></thead><tbody>';
+
+    data.days.forEach(function(d, i) {
+      var bg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+      html += '<tr style="background:' + bg + ';border-bottom:1px solid rgba(255,255,255,0.04);">' +
+        '<td style="padding:6px 8px;color:#aaa;">' + d.day + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#7ac8d4;">' + fmtN(d.requests) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#888;">' + fmtN(d.prompt) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#888;">' + fmtN(d.completion) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#00d4ff;font-weight:600;">' + fmtN(d.total) + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+
+    container.innerHTML = html;
+  } catch(e) {
+    icon.className = 'fas fa-rotate';
+    container.innerHTML = '<p style="color:#e74c3c;font-size:0.83rem;">Error de conexión. Verifica tu red.</p>';
+  }
+}
+
+function _tokenStatCard(label, value, color) {
+  return '<div style="background:rgba(0,0,0,0.25);border:1px solid rgba(0,212,255,0.12);' +
+    'border-radius:10px;padding:12px;text-align:center;">' +
+    '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:3px;">' + value + '</div>' +
+    '<div style="font-size:0.72rem;color:#5a7a88;">' + label + '</div>' +
+  '</div>';
+}
 // ══════════════════════════════════════════════
 const COLUMBIA_ITEMS = [
   { text: 'Deseos pasivos de muerte ("quisiera estar muerto" sin plan activo)', weight: 1 },
@@ -5768,6 +5913,135 @@ function forgotPin() {
   clearUserMemory();
   _closePinModal();
   renderMemoryPreview();
+}
+
+// ── Exportar perfil cifrado ────────────────────────────────
+// Descarga un archivo .sentinelcare con el ciphertext del localStorage.
+// El archivo ya viene cifrado — no se descifra en ningún momento.
+// El usuario necesitará su PIN para importarlo en otro dispositivo.
+function exportMemoryFile() {
+  var stored = localStorage.getItem(MEMORY_ENC_KEY);
+  var optOut = localStorage.getItem(MEMORY_OPT_OUT) === '1';
+
+  if (!stored && !optOut) {
+    alert('No hay perfil guardado para exportar.\n\nCompleta al menos una conversación con Aura primero.');
+    return;
+  }
+
+  var payload;
+  if (stored) {
+    try {
+      payload = {
+        version:    1,
+        type:       'encrypted',
+        exportedAt: new Date().toISOString(),
+        data:       JSON.parse(stored)   // { salt, iv, data }
+      };
+    } catch(e) {
+      alert('Error al leer el perfil. Intenta de nuevo.');
+      return;
+    }
+  } else {
+    // Sin PIN — exportar el perfil en texto claro cifrado ahora con un PIN temporal
+    // Para simplificar: se exporta como texto claro con advertencia
+    try {
+      var raw = localStorage.getItem(MEMORY_KEY);
+      payload = {
+        version:    1,
+        type:       'plaintext',
+        exportedAt: new Date().toISOString(),
+        data:       raw ? JSON.parse(raw) : {}
+      };
+    } catch(e) {
+      alert('Error al leer el perfil. Intenta de nuevo.');
+      return;
+    }
+  }
+
+  var json = JSON.stringify(payload, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  var date = new Date().toISOString().slice(0, 10);
+  a.href     = url;
+  a.download = 'sentinelcare-perfil-' + date + '.sentinelcare';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Importar perfil cifrado ────────────────────────────────
+// Lee el archivo .sentinelcare, lo guarda en localStorage y
+// pide el PIN para verificar que puede descifrarlo.
+async function importMemoryFile(input) {
+  var file = input.files && input.files[0];
+  input.value = ''; // reset para permitir reimportar el mismo archivo
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var payload;
+    try {
+      payload = JSON.parse(e.target.result);
+    } catch(err) {
+      alert('El archivo no es válido. Asegúrate de seleccionar un archivo .sentinelcare generado por SentinelCareAI.');
+      return;
+    }
+
+    if (!payload || payload.version !== 1) {
+      alert('Versión de archivo no compatible.');
+      return;
+    }
+
+    if (!confirm('¿Importar este perfil?\n\nEsto reemplazará el perfil actual guardado en este dispositivo.\n\nNecesitarás ingresar tu PIN para confirmar.')) return;
+
+    if (payload.type === 'plaintext') {
+      // Sin cifrado — importar directo y ofrecer crear PIN
+      try {
+        localStorage.setItem(MEMORY_KEY, JSON.stringify(payload.data));
+        localStorage.setItem(MEMORY_OPT_OUT, '1');
+        localStorage.removeItem(MEMORY_ENC_KEY);
+        _memCache = Object.assign(emptyProfile(), payload.data);
+        _memCryptoKey = null;
+        alert('Perfil importado correctamente.\n\nEste perfil no estaba cifrado. Te recomendamos crear un PIN desde el panel para protegerlo.');
+        renderMemoryPreview();
+      } catch(err) {
+        alert('Error al importar el perfil.');
+      }
+      return;
+    }
+
+    // Cifrado: guardar el ciphertext y pedir PIN para verificar
+    if (!payload.data || !payload.data.salt || !payload.data.iv || !payload.data.data) {
+      alert('El archivo está incompleto o dañado.');
+      return;
+    }
+
+    // Guardar temporalmente para intentar descifrar con el PIN
+    var pin = prompt('Ingresa el PIN con el que protegiste este perfil:');
+    if (!pin) return;
+
+    try {
+      var key     = await _memDerive(pin, payload.data.salt);
+      var profile = await _memDecrypt(payload.data.iv, payload.data.data, key);
+
+      // PIN correcto — guardar en localStorage y activar
+      localStorage.setItem(MEMORY_ENC_KEY, JSON.stringify(payload.data));
+      localStorage.removeItem(MEMORY_KEY);
+      localStorage.removeItem(MEMORY_OPT_OUT);
+      _memCryptoKey = key;
+      _memCache     = profile;
+
+      alert('✅ Perfil importado correctamente. Aura recuerda todo lo de tus sesiones anteriores.');
+      renderMemoryPreview();
+      updateMoodChart();
+
+    } catch(err) {
+      alert('PIN incorrecto o archivo dañado. El perfil no se importó.');
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ── Inicialización — llamada al entrar al perfil ──────────

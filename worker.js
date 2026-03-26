@@ -229,7 +229,26 @@ function logError(env, context) {
   }).catch(err => console.warn('[logError] Webhook falló:', err.message));
 }
 
-// ── Main handler ──────────────────────────────────────────
+// ── Token usage logging — fire-and-forget ────────────────
+// Registra el uso de tokens por request en KV.
+// Clave: tokens:YYYY-MM-DD:RANDOM  TTL: 90 días
+// Campos: endpoint, model, prompt_tokens, completion_tokens, total_tokens, ts
+function logTokens(env, { endpoint, model, usage }) {
+  if (!env.RATE_LIMIT_KV || !usage) return;
+  const now  = Date.now();
+  const day  = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD
+  const id   = `tokens:${day}:${Math.random().toString(36).slice(2, 9)}`;
+  const entry = {
+    ts:                now,
+    endpoint,
+    model,
+    prompt_tokens:     usage.prompt_tokens     || 0,
+    completion_tokens: usage.completion_tokens || 0,
+    total_tokens:      usage.total_tokens      || 0,
+  };
+  env.RATE_LIMIT_KV.put(id, JSON.stringify(entry), { expirationTtl: 60 * 60 * 24 * 90 })
+    .catch(e => console.warn('[logTokens] KV write failed:', e.message));
+}
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || 'null';
@@ -481,6 +500,10 @@ export default {
 
       // ── Respuesta normal (JSON) ───────────────────────────
       const data = await groqRes.json();
+      // Log de tokens (fire-and-forget)
+      if (groqRes.ok && data.usage) {
+        logTokens(env, { endpoint: 'chat', model: safe.model, usage: data.usage });
+      }
       return jsonResponse(data, groqRes.status, origin);
     }
 
@@ -560,6 +583,10 @@ export default {
       }
 
       const data = await groqRes.json();
+      // Log de tokens (fire-and-forget)
+      if (groqRes.ok && data.usage) {
+        logTokens(env, { endpoint: 'extract-memory', model: safe.model, usage: data.usage });
+      }
       return jsonResponse(data, groqRes.status, origin);
     }
 
@@ -691,6 +718,83 @@ export default {
         return jsonResponse({ logs: sorted }, 200, origin);
       } catch (e) {
         return errorResponse('Error al leer logs.', 500, origin);
+      }
+    }
+
+    // ── /token-stats ──────────────────────────────────
+    // Devuelve el uso de tokens agregado por día y por modelo.
+    // Protegido con PRO_PASSWORD_HASH.
+    if (url.pathname === '/token-stats') {
+      if (!env.PRO_PASSWORD_HASH) {
+        return errorResponse('Proxy mal configurado — falta PRO_PASSWORD_HASH', 500, origin);
+      }
+      let body;
+      try { body = await request.json(); } catch {
+        return errorResponse('JSON inválido', 400, origin);
+      }
+      // Verificar contraseña en tiempo constante
+      const enc3  = new TextEncoder();
+      const hBuf3 = await crypto.subtle.digest('SHA-256', enc3.encode(body.password || ''));
+      const hB643 = btoa(String.fromCharCode(...new Uint8Array(hBuf3)));
+      const ta    = enc3.encode(hB643);
+      const tb    = enc3.encode(env.PRO_PASSWORD_HASH);
+      let   td    = ta.length ^ tb.length;
+      const tl    = Math.min(ta.length, tb.length);
+      for (let i = 0; i < tl; i++) td |= ta[i] ^ tb[i];
+      if (td !== 0) return errorResponse('No autorizado.', 401, origin);
+
+      if (!env.RATE_LIMIT_KV) {
+        return jsonResponse({ stats: [], warning: 'KV no configurado.' }, 200, origin);
+      }
+
+      try {
+        const list = await env.RATE_LIMIT_KV.list({ prefix: 'tokens:' });
+        // Agregar por día y por modelo
+        const byDay   = {};  // { 'YYYY-MM-DD': { prompt, completion, total, requests } }
+        const byModel = {};  // { 'model-name': { prompt, completion, total, requests } }
+        let grandTotal = { prompt: 0, completion: 0, total: 0, requests: 0 };
+
+        await Promise.all(list.keys.map(async k => {
+          try {
+            const raw   = await env.RATE_LIMIT_KV.get(k.name);
+            const entry = JSON.parse(raw);
+            if (!entry || !entry.total_tokens) return;
+
+            const day   = k.name.split(':')[1] || 'unknown';
+            const model = entry.model || 'unknown';
+
+            if (!byDay[day])     byDay[day]     = { prompt: 0, completion: 0, total: 0, requests: 0 };
+            if (!byModel[model]) byModel[model] = { prompt: 0, completion: 0, total: 0, requests: 0 };
+
+            byDay[day].prompt     += entry.prompt_tokens;
+            byDay[day].completion += entry.completion_tokens;
+            byDay[day].total      += entry.total_tokens;
+            byDay[day].requests   += 1;
+
+            byModel[model].prompt     += entry.prompt_tokens;
+            byModel[model].completion += entry.completion_tokens;
+            byModel[model].total      += entry.total_tokens;
+            byModel[model].requests   += 1;
+
+            grandTotal.prompt     += entry.prompt_tokens;
+            grandTotal.completion += entry.completion_tokens;
+            grandTotal.total      += entry.total_tokens;
+            grandTotal.requests   += 1;
+          } catch(e) {}
+        }));
+
+        // Ordenar días descendente
+        const days = Object.entries(byDay)
+          .sort((a, b) => b[0].localeCompare(a[0]))
+          .map(([day, v]) => ({ day, ...v }));
+
+        const models = Object.entries(byModel)
+          .sort((a, b) => b[1].total - a[1].total)
+          .map(([model, v]) => ({ model, ...v }));
+
+        return jsonResponse({ days, models, grandTotal }, 200, origin);
+      } catch(e) {
+        return errorResponse('Error al leer estadísticas.', 500, origin);
       }
     }
 
