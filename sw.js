@@ -10,7 +10,7 @@
  * offline.html se precachea en install para estar siempre disponible.
  */
 
-const CACHE_NAME  = 'sentinelcare-v2';   // bump version → limpia cache anterior
+const CACHE_NAME  = 'sentinelcare-v3';   // bump version → limpia cache anterior
 const PROXY_HOST  = 'sentinel-proxy.sentinelpablo.workers.dev';
 const OFFLINE_URL = './offline.html';
 
@@ -55,6 +55,24 @@ self.addEventListener('activate', event => {
           })
       ))
       .then(() => self.clients.claim())
+  );
+});
+
+// ── Clic en notificación de bienestar ─────────────────────
+// Abre la app (o la enfoca si ya está abierta) al tocar la notificación.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // Si la app ya está abierta en alguna pestaña, enfocarla
+      for (const client of clients) {
+        if (client.url.includes('/SentinelCareAI') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Si no, abrir una nueva ventana
+      return self.clients.openWindow('./');
+    })
   );
 });
 

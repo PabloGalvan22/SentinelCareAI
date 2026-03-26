@@ -1621,6 +1621,93 @@ body.dark-mode #panic-btn { box-shadow: 0 8px 32px rgba(192,57,43,0.65), 0 0 0 0
 }
 
 body.dark-mode .session-restore-bar  { background: rgba(61,122,138,0.1); border-color: rgba(61,122,138,0.22); }
+
+/* ─── HISTORIAL DE SESIONES — DRAWER ─────────── */
+#history-drawer {
+  position: fixed;
+  top: 0; right: -360px;
+  width: 340px; max-width: 92vw;
+  height: 100%;
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.18);
+  z-index: 500;
+  display: flex; flex-direction: column;
+  transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+#history-drawer.open { right: 0; }
+.history-drawer-overlay {
+  position: fixed; inset: 0; z-index: 499;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.history-drawer-overlay.open { opacity: 1; pointer-events: all; }
+.history-drawer-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.history-drawer-header h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem; font-weight: 600;
+  color: var(--text-dark); margin: 0;
+}
+.history-close-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-light); font-size: 1rem; padding: 4px;
+  transition: color 0.2s;
+}
+.history-close-btn:hover { color: var(--text-dark); }
+.history-list {
+  flex: 1; overflow-y: auto; padding: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.history-card {
+  background: var(--warm-white);
+  border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 14px 16px;
+  margin-bottom: 10px; cursor: pointer;
+  transition: all 0.2s;
+}
+.history-card:hover {
+  border-color: var(--teal);
+  box-shadow: var(--shadow);
+  transform: translateX(-3px);
+}
+.history-card-top {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 6px;
+}
+.history-card-badge {
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: 20px;
+}
+.history-card-date {
+  font-size: 0.72rem; color: var(--text-light);
+}
+.history-card-preview {
+  font-size: 0.83rem; color: var(--text-mid);
+  line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.history-card-msgs {
+  font-size: 0.7rem; color: var(--text-light);
+  margin-top: 6px;
+}
+.history-empty {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-light); font-size: 0.85rem;
+}
+.history-empty i { font-size: 2rem; margin-bottom: 12px; display: block; color: var(--teal-light); }
+body.dark-mode .history-card { background: rgba(255,255,255,0.04); }
+body.dark-mode #history-drawer { box-shadow: -8px 0 40px rgba(0,0,0,0.5); }
 body.dark-mode .session-saved-pill   { background: rgba(107,143,113,0.15); }
 
 /* ─── MEMORY STATUS PILL ─────────────────────── */
@@ -1946,6 +2033,50 @@ body.dark-mode .btn-save-session { border-color: rgba(107,143,113,0.35); }
 }
 .tts-speaking-indicator.active { display: flex; }
 .tts-speaking-indicator i { animation: ttsIcon 1.2s ease-in-out infinite; }
+
+/* ─── MODO VOZ COMPLETO ───────────────────────── */
+.voice-mode-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 11px;
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--text-light);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.25s;
+  white-space: nowrap;
+}
+.voice-mode-btn:hover { border-color: var(--teal); color: var(--teal); }
+.voice-mode-btn.active {
+  background: linear-gradient(135deg, var(--sage), var(--teal));
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 2px 10px rgba(61,122,138,0.35);
+  animation: voicePulse 2s ease-in-out infinite;
+}
+@keyframes voicePulse {
+  0%, 100% { box-shadow: 0 2px 10px rgba(61,122,138,0.35); }
+  50%       { box-shadow: 0 2px 18px rgba(61,122,138,0.6); }
+}
+.voice-mode-waiting {
+  display: none; align-items: center; gap: 6px;
+  font-size: 0.75rem; color: var(--teal);
+  animation: fadeIn 0.3s ease;
+}
+.voice-mode-waiting.active { display: flex; }
+.voice-mode-dots span {
+  display: inline-block; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--teal);
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+.voice-mode-dots span:nth-child(2) { animation-delay: 0.2s; }
+.voice-mode-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1);   opacity: 1; }
+}
 @keyframes ttsIcon { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
 
 body.dark-mode .chat-btn-mic { background: var(--warm-white); border-color: var(--border); }
@@ -2457,6 +2588,17 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
 </head>
 <body>
 
+<!-- Skip navigation — accesibilidad teclado/lector de pantalla -->
+<a href="#chat-input" id="skip-link"
+  style="position:absolute;top:-40px;left:0;z-index:99999;
+  background:var(--teal);color:white;padding:8px 16px;
+  border-radius:0 0 8px 0;font-size:0.9rem;font-weight:600;
+  transition:top 0.2s;text-decoration:none;"
+  onfocus="this.style.top='0'"
+  onblur="this.style.top='-40px'">
+  Ir al chat
+</a>
+
 <!-- Background -->
 <div class="bg-layer"></div>
 <div class="bg-blob bg-blob-1"></div>
@@ -2487,28 +2629,23 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
     <p class="choose-label">Elige el perfil que mas se asemeje a ti</p>
 
     <div class="profile-grid">
-      <div class="profile-card joven" onclick="enterApp('joven')">
-        <div class="profile-icon"><i class="fas fa-seedling"></i></div>
-        <div class="profile-name">Joven</div>
-        <div class="profile-desc">Adolescente o adulto joven buscando apoyo emocional</div>
+      <div class="profile-card joven" onclick="enterApp('personal')" role="button" tabindex="0" aria-label="Apoyo personal — espacio seguro para hablar con Aura sobre cómo te sientes" onkeydown="if(event.key==='Enter'||event.key===' ')enterApp('personal')" style="grid-column: 1 / -1;">
+        <div class="profile-icon" aria-hidden="true" style="background:linear-gradient(135deg,rgba(107,143,113,0.2),rgba(61,122,138,0.2));"><i class="fas fa-heart"></i></div>
+        <div class="profile-name">Apoyo personal</div>
+        <div class="profile-desc">Un espacio seguro para hablar de cómo te sientes, sin importar tu edad ni lo que estés viviendo</div>
       </div>
-      <div class="profile-card adulto" onclick="enterApp('adulto')">
-        <div class="profile-icon"><i class="fas fa-person"></i></div>
-        <div class="profile-name">Adulto</div>
-        <div class="profile-desc">Persona adulta que atraviesa una etapa difícil</div>
-      </div>
-      <div class="profile-card salud" onclick="enterApp('salud')">
-        <div class="profile-icon"><i class="fas fa-stethoscope"></i></div>
+      <div class="profile-card salud" onclick="enterApp('salud')" role="button" tabindex="0" aria-label="Entrar como Profesional de la Salud — requiere contraseña" onkeydown="if(event.key==='Enter'||event.key===' ')enterApp('salud')">
+        <div class="profile-icon" aria-hidden="true"><i class="fas fa-stethoscope"></i></div>
         <div class="profile-name">Profesional de la Salud</div>
         <div class="profile-desc">Psicólogo, psiquiatra, médico o trabajador social</div>
       </div>
-      <div class="profile-card maestro" onclick="enterApp('maestro')">
-        <div class="profile-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+      <div class="profile-card maestro" onclick="enterApp('maestro')" role="button" tabindex="0" aria-label="Entrar como Maestro o Educador — requiere contraseña" onkeydown="if(event.key==='Enter'||event.key===' ')enterApp('maestro')">
+        <div class="profile-icon" aria-hidden="true"><i class="fas fa-chalkboard-teacher"></i></div>
         <div class="profile-name">Maestro / Educador</div>
         <div class="profile-desc">Docente que desea identificar señales de alerta en su grupo</div>
       </div>
-      <div class="profile-card padre" onclick="enterApp('padre')">
-        <div class="profile-icon"><i class="fas fa-home"></i></div>
+      <div class="profile-card padre" onclick="enterApp('padre')" role="button" tabindex="0" aria-label="Entrar como Padre o Madre de Familia" onkeydown="if(event.key==='Enter'||event.key===' ')enterApp('padre')">
+        <div class="profile-icon" aria-hidden="true"><i class="fas fa-home"></i></div>
         <div class="profile-name">Padre / Madre de Familia</div>
         <div class="profile-desc">Quieres apoyar a tu hija/o y saber cómo actuar ante señales de alerta</div>
       </div>
@@ -2537,7 +2674,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <div class="header-dot"><i class="fas fa-heart"></i></div>
       SentinelCareAI
     </div>
-    <span class="header-badge" id="personal-badge">Joven</span>
+    <span class="header-badge" id="personal-badge">Apoyo personal</span>
     <div style="display:flex;gap:8px;align-items:center;">
       <button class="dark-toggle" onclick="toggleDark()" title="Modo oscuro"><i class="fas fa-moon"></i></button>
       <button class="btn-back" onclick="goBack()"><i class="fas fa-arrow-left"></i> Volver</button>
@@ -2728,6 +2865,30 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <div id="moodEmptyMessage" class="wellness-empty" style="display: none;">
         <i class="fas fa-smile-wink"></i>
         <p>Aún no hay registros. Toca un emoji o empieza a chatear con Aura y la gráfica se irá completando sola.</p>
+      </div>
+
+      <!-- Notificaciones de bienestar -->
+      <div id="notif-wellness-section" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i class="fas fa-bell" style="color:var(--teal);font-size:0.9rem;"></i>
+            <div>
+              <div style="font-size:0.85rem;font-weight:600;color:var(--text-dark);">Recordatorio diario</div>
+              <div id="notif-wellness-sub" style="font-size:0.75rem;color:var(--text-light);margin-top:1px;">
+                Activa para recibir "¿Cómo estás hoy?" al abrir la app
+              </div>
+            </div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;cursor:pointer;">
+            <input type="checkbox" id="notif-wellness-toggle" onchange="toggleWellnessNotifications(this.checked)"
+              style="opacity:0;width:0;height:0;position:absolute;" aria-label="Activar recordatorio diario de bienestar">
+            <span id="notif-wellness-track" style="position:absolute;inset:0;border-radius:12px;
+              background:rgba(107,143,113,0.2);border:1.5px solid var(--border);transition:all 0.25s;"></span>
+            <span id="notif-wellness-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;
+              border-radius:50%;background:var(--text-light);transition:all 0.25s;"></span>
+          </label>
+        </div>
+        <div id="notif-wellness-status" style="font-size:0.73rem;color:var(--text-light);margin-top:8px;padding-left:26px;"></div>
       </div>
     </div>
 
@@ -3381,21 +3542,24 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
     </div>
     <span class="header-badge" id="chat-badge">Contigo Siempre</span>
     <div style="display:flex;gap:8px;align-items:center;">
-      <span class="session-saved-pill" id="session-saved-pill" style="display:none;">
-        <i class="fas fa-floppy-disk"></i> Guardado
+      <span class="session-saved-pill" id="session-saved-pill" style="display:none;" role="status" aria-live="polite">
+        <i class="fas fa-floppy-disk" aria-hidden="true"></i> Guardado
       </span>
-      <span class="memory-pill" id="memory-pill" style="display:none;" aria-live="polite"></span>
-      <button class="btn-save-session" id="btn-save-session" onclick="openSaveConsentModal()" title="Guardar conversación para retomar después" style="display:none;">
-        <i class="fas fa-bookmark"></i> Guardar
+      <span class="memory-pill" id="memory-pill" style="display:none;" aria-live="assertive" aria-atomic="true"></span>
+      <button class="btn-save-session" id="btn-history" onclick="openHistoryDrawer()" title="Ver conversaciones guardadas" style="display:none;border-color:rgba(155,139,180,0.45);color:var(--lavender);" aria-label="Ver historial de conversaciones guardadas">
+        <i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Historial
       </button>
-      <button class="btn-save-session" id="btn-pdf-chat" onclick="exportChatPDF()" title="Descargar conversación como PDF" style="display:none;border-color:rgba(61,122,138,0.45);color:var(--teal);">
-        <i class="fas fa-file-pdf"></i> PDF
+      <button class="btn-save-session" id="btn-save-session" onclick="openSaveConsentModal()" title="Guardar conversación para retomar después" style="display:none;" aria-label="Guardar conversación para retomar después">
+        <i class="fas fa-bookmark" aria-hidden="true"></i> Guardar
       </button>
-      <button class="btn-back" onclick="nuevaConversacion()" title="Nueva conversación" style="border-color:var(--sage);color:var(--sage);">
-        <i class="fas fa-rotate-right"></i> Nueva
+      <button class="btn-save-session" id="btn-pdf-chat" onclick="exportChatPDF()" title="Descargar conversación como PDF" style="display:none;border-color:rgba(61,122,138,0.45);color:var(--teal);" aria-label="Descargar conversación como PDF">
+        <i class="fas fa-file-pdf" aria-hidden="true"></i> PDF
       </button>
-      <button class="dark-toggle" onclick="toggleDark()" title="Modo oscuro"><i class="fas fa-moon"></i></button>
-      <button class="btn-back" onclick="goBackFromChat()"><i class="fas fa-arrow-left"></i> Volver</button>
+      <button class="btn-back" onclick="nuevaConversacion()" title="Nueva conversación" style="border-color:var(--sage);color:var(--sage);" aria-label="Iniciar nueva conversación">
+        <i class="fas fa-rotate-right" aria-hidden="true"></i> Nueva
+      </button>
+      <button class="dark-toggle" onclick="toggleDark()" title="Cambiar modo oscuro/claro" aria-label="Cambiar entre modo oscuro y claro"><i class="fas fa-moon" aria-hidden="true"></i></button>
+      <button class="btn-back" onclick="goBackFromChat()" aria-label="Volver a la pantalla anterior"><i class="fas fa-arrow-left" aria-hidden="true"></i> Volver</button>
     </div>
   </header>
 
@@ -3420,7 +3584,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       </span>
     </div>
 
-    <div class="chat-messages" id="chat-messages">
+    <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Conversación con Aura" aria-relevant="additions">
       <!-- messages rendered here -->
     </div>
 
@@ -3428,41 +3592,51 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
       <div class="chat-file-preview-bar" id="chat-file-preview-bar" style="display:none;"></div>
 
       <!-- Voice status indicator -->
-      <div class="voice-status" id="voice-status">
-        <div class="voice-waves">
+      <div class="voice-status" id="voice-status" role="status" aria-live="polite" aria-label="Estado del micrófono">
+        <div class="voice-waves" aria-hidden="true">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
         Escuchando… habla ahora
-        <span id="voice-interim" style="font-style:italic;opacity:0.75;"></span>
+        <span id="voice-interim" style="font-style:italic;opacity:0.75;" aria-live="polite"></span>
       </div>
 
       <div class="chat-input-row">
-        <button class="chat-btn chat-btn-attach" onclick="document.getElementById('chat-file-input').click()" title="Adjuntar imagen o archivo">
-          <i class="fas fa-paperclip"></i>
+        <button class="chat-btn chat-btn-attach" onclick="document.getElementById('chat-file-input').click()" title="Adjuntar imagen o archivo" aria-label="Adjuntar imagen o archivo">
+          <i class="fas fa-paperclip" aria-hidden="true"></i>
         </button>
-        <input type="file" id="chat-file-input" accept="image/*,.pdf,.txt,.csv" multiple>
-        <textarea id="chat-input" rows="1" placeholder="Escríbeme cómo te sientes…" onkeydown="chatKeyHandler(event)" oninput="autoResize(this);updateCharCount(this)"></textarea>
-        <button class="chat-btn-mic" id="mic-btn" onclick="toggleVoiceInput()" title="Hablar con Aura">
-          <i class="fas fa-microphone"></i>
+        <input type="file" id="chat-file-input" accept="image/*,.pdf,.txt,.csv" multiple aria-label="Seleccionar archivo para adjuntar">
+        <textarea id="chat-input" rows="1" placeholder="Escríbeme cómo te sientes…" onkeydown="chatKeyHandler(event)" oninput="autoResize(this);updateCharCount(this)" aria-label="Escribe tu mensaje a Aura" aria-multiline="true"></textarea>
+        <button class="chat-btn-mic" id="mic-btn" onclick="toggleVoiceInput()" title="Hablar con Aura" aria-label="Activar micrófono para hablar con Aura" aria-pressed="false">
+          <i class="fas fa-microphone" aria-hidden="true"></i>
         </button>
-        <button class="chat-btn chat-btn-send" id="chat-send-btn" onclick="sendMessage()" title="Enviar">
-          <i class="fas fa-paper-plane"></i>
+        <button class="chat-btn chat-btn-send" id="chat-send-btn" onclick="sendMessage()" title="Enviar mensaje" aria-label="Enviar mensaje">
+          <i class="fas fa-paper-plane" aria-hidden="true"></i>
         </button>
       </div>
 
       <!-- Bottom bar: char counter + TTS toggle -->
       <div class="voice-bar">
-        <div class="tts-speaking-indicator" id="tts-indicator">
-          <i class="fas fa-volume-high"></i> Aura está hablando…
-          <button onclick="stopTTS()" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:0.75rem;padding:0 0 0 4px;">
-            <i class="fas fa-stop"></i> Detener
+        <div class="tts-speaking-indicator" id="tts-indicator" role="status" aria-live="polite" aria-label="Aura está respondiendo en voz">
+          <i class="fas fa-volume-high" aria-hidden="true"></i> Aura está hablando…
+          <button onclick="stopTTS()" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:0.75rem;padding:0 0 0 4px;" aria-label="Detener voz de Aura">
+            <i class="fas fa-stop" aria-hidden="true"></i> Detener
           </button>
         </div>
+        <!-- Indicador "Escuchando…" en modo voz -->
+        <div class="voice-mode-waiting" id="voice-mode-waiting" aria-live="polite">
+          <div class="voice-mode-dots"><span></span><span></span><span></span></div>
+          Escuchando…
+        </div>
+        <button class="voice-mode-btn" id="voice-mode-btn" onclick="toggleVoiceMode()"
+          title="Modo conversación de voz — Aura escucha y responde sin tocar la pantalla"
+          aria-label="Activar modo conversación de voz" aria-pressed="false">
+          <i class="fas fa-microphone-lines" aria-hidden="true"></i> Modo voz
+        </button>
         <label title="Aura te responderá en voz alta">
-          <input type="checkbox" id="tts-toggle" onchange="setTTS(this.checked)">
-          <i class="fas fa-volume-low" style="color:var(--teal);"></i> Respuesta en voz
+          <input type="checkbox" id="tts-toggle" onchange="setTTS(this.checked)" aria-label="Activar respuesta en voz de Aura">
+          <i class="fas fa-volume-low" style="color:var(--teal);" aria-hidden="true"></i> Respuesta en voz
         </label>
-        <div class="char-counter" id="char-counter" style="display:none;"></div>
+        <div class="char-counter" id="char-counter" style="display:none;" aria-live="polite" aria-label="Contador de caracteres"></div>
       </div>
     </div>
 
@@ -3475,6 +3649,9 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
 <script>
 // ── STATE ──
 let currentProfile = null;
+// Edad detectada en conversación: null | 'joven' | 'adulto'
+// Se actualiza cuando el usuario menciona su edad en el chat.
+let _detectedAgeGroup = null;
 let fileData = null;
 let fileName = '';
 let results = [];
@@ -3841,6 +4018,137 @@ function showLegalIfNeeded() {
 function acceptLegal() {
   localStorage.setItem(LEGAL_KEY, '1');
   document.getElementById('legal-modal').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════
+// NOTIFICACIONES DE BIENESTAR DIARIAS
+// ──────────────────────────────────────────────
+// Al abrir la app se verifica si pasaron ≥24h desde la última notificación.
+// Si sí, y el usuario tiene permiso, se muestra via ServiceWorkerRegistration.
+// No requiere servidor push — funciona solo cuando la app está abierta.
+// ══════════════════════════════════════════════
+const NOTIF_WELLNESS_KEY      = 'sentinelWellnessNotif';  // 'on' | 'off'
+const NOTIF_WELLNESS_LAST_KEY = 'sentinelWellnessLast';   // timestamp ISO
+
+function _notifSupported() {
+  return 'Notification' in window && 'serviceWorker' in navigator;
+}
+
+// Inicializa el UI del toggle y dispara la notificación si corresponde
+async function initWellnessNotifications() {
+  var section = document.getElementById('notif-wellness-section');
+  if (!section) return;
+
+  if (!_notifSupported()) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  var enabled = localStorage.getItem(NOTIF_WELLNESS_KEY) === 'on';
+  _setNotifToggleUI(enabled && Notification.permission === 'granted');
+
+  if (enabled && Notification.permission === 'granted') {
+    await _maybeSendWellnessNotif();
+  }
+}
+
+function _setNotifToggleUI(active) {
+  var checkbox = document.getElementById('notif-wellness-toggle');
+  var track    = document.getElementById('notif-wellness-track');
+  var thumb    = document.getElementById('notif-wellness-thumb');
+  var sub      = document.getElementById('notif-wellness-sub');
+  var status   = document.getElementById('notif-wellness-status');
+  if (!checkbox) return;
+
+  checkbox.checked = active;
+  if (active) {
+    track.style.background   = 'linear-gradient(135deg,var(--sage),var(--teal))';
+    track.style.borderColor  = 'var(--teal)';
+    thumb.style.background   = 'white';
+    thumb.style.left         = '23px';
+    sub.textContent = 'Recibirás un recordatorio al abrir la app cada día';
+    var last = localStorage.getItem(NOTIF_WELLNESS_LAST_KEY);
+    status.textContent = last
+      ? 'Último recordatorio: ' + new Date(last).toLocaleDateString('es-MX', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+      : 'El primer recordatorio llegará mañana al abrir la app.';
+  } else {
+    track.style.background  = 'rgba(107,143,113,0.2)';
+    track.style.borderColor = 'var(--border)';
+    thumb.style.background  = 'var(--text-light)';
+    thumb.style.left        = '3px';
+    sub.textContent = 'Activa para recibir "¿Cómo estás hoy?" al abrir la app';
+    status.textContent = '';
+  }
+}
+
+async function toggleWellnessNotifications(checked) {
+  if (!checked) {
+    localStorage.setItem(NOTIF_WELLNESS_KEY, 'off');
+    _setNotifToggleUI(false);
+    return;
+  }
+
+  // Pedir permiso si no está concedido
+  if (Notification.permission === 'denied') {
+    alert('Los permisos de notificación están bloqueados en tu navegador.\n\nPara activarlos: ve a Configuración del sitio en tu navegador y permite las notificaciones para SentinelCareAI.');
+    document.getElementById('notif-wellness-toggle').checked = false;
+    return;
+  }
+
+  if (Notification.permission !== 'granted') {
+    var perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      document.getElementById('notif-wellness-toggle').checked = false;
+      _setNotifToggleUI(false);
+      return;
+    }
+  }
+
+  localStorage.setItem(NOTIF_WELLNESS_KEY, 'on');
+  _setNotifToggleUI(true);
+  // Mostrar una notificación de confirmación inmediata
+  _showWellnessNotif('¡Recordatorio activado! 🌿', 'Mañana al abrir SentinelCareAI te preguntaremos cómo estás.');
+}
+
+async function _maybeSendWellnessNotif() {
+  var lastStr = localStorage.getItem(NOTIF_WELLNESS_LAST_KEY);
+  var now     = Date.now();
+  var MS_24H  = 24 * 3600 * 1000;
+
+  if (lastStr) {
+    var elapsed = now - new Date(lastStr).getTime();
+    if (elapsed < MS_24H) return; // ya se envió en las últimas 24h
+  }
+
+  // No enviar si el usuario ya registró su ánimo hoy
+  var today = new Date().toISOString().split('T')[0];
+  var moodHoy = moodHistory.find(function(e) { return e.date === today; });
+  if (moodHoy) return;
+
+  await _showWellnessNotif('¿Cómo estás hoy? 💚', 'Tómate un momento para registrar cómo te sientes. Aura está aquí para acompañarte.');
+  localStorage.setItem(NOTIF_WELLNESS_LAST_KEY, new Date().toISOString());
+  _setNotifToggleUI(true); // actualizar texto "último recordatorio"
+}
+
+async function _showWellnessNotif(title, body) {
+  try {
+    var reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(title, {
+      body,
+      icon:    './icon-192.png',
+      badge:   './icon-192.png',
+      tag:     'sentinel-bienestar',   // reemplaza la anterior si sigue visible
+      renotify: false,
+      data:    { url: './' },
+      actions: [
+        { action: 'open',   title: '😊 Registrar ánimo' },
+        { action: 'ignore', title: 'Ahora no' }
+      ]
+    });
+  } catch(e) {
+    console.warn('[Notif] No se pudo mostrar la notificación:', e.message);
+  }
 }
 
 function toggleDark() {
@@ -4268,20 +4576,18 @@ function enterApp(profile) {
   currentProfile = profile;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
 
-  if (profile === 'joven' || profile === 'adulto') {
+  if (profile === 'personal' || profile === 'joven' || profile === 'adulto') {
+    // Normalizar perfiles legacy
+    if (profile === 'joven' || profile === 'adulto') currentProfile = 'personal';
     document.getElementById('s-personal').classList.add('active');
     const badge    = document.getElementById('personal-badge');
     const greeting = document.getElementById('personal-greeting');
-    if (profile === 'joven') {
-      badge.textContent    = 'Joven';
-      greeting.textContent = 'Hola — este es tu espacio seguro';
-    } else {
-      badge.textContent    = 'Adulto';
-      greeting.textContent = 'Hola — estamos aquí contigo';
-    }
+    badge.textContent    = 'Apoyo personal';
+    greeting.textContent = 'Hola — este es tu espacio seguro';
     setTimeout(updateMoodChart, 100);
     setTimeout(renderMemoryPreview, 150);
     setTimeout(initMemoryEncryption, 300);
+    setTimeout(initWellnessNotifications, 500);
     history.pushState({ screen: 's-personal' }, '');
     window.scrollTo(0, 0);
   }
@@ -5651,9 +5957,21 @@ CÓMO ACOMPAÑARLOS:
 — Si hay señales de alerta serias en lo que describen de su hijo/a, nómbralas con cuidado y oriéntalos hacia recursos sin alarmarlos innecesariamente.
 — Recuérdales que pedir ayuda es un acto de amor, no de fracaso.`;
 
-  if (currentProfile === 'joven')  return base + perfilJoven;
   if (currentProfile === 'padre')  return base + perfilPadre;
-  return base + perfilAdulto; // adulto por defecto
+
+  // Perfil personal (unificado joven+adulto):
+  // Aura usa el perfil neutro por defecto. Si detectó la edad en la conversación
+  // (_detectedAgeGroup), adapta el tono automáticamente.
+  if (_detectedAgeGroup === 'joven')  return base + perfilJoven;
+  if (_detectedAgeGroup === 'adulto') return base + perfilAdulto;
+
+  // Sin edad detectada aún → perfil neutro que invita naturalmente a preguntar
+  const perfilPersonal = `
+
+PERFIL DE LA PERSONA: APOYO PERSONAL (edad no determinada)
+Todavía no sabes si la persona es joven o adulta. En los primeros intercambios, dentro de la conversación natural, puedes preguntar de forma suave y genuina: "¿Cuántos años tienes, si me permites preguntarte?" Solo una vez, sin insistir. Usa su respuesta para adaptar tu tono de aquí en adelante — más cercano e informal si es joven, más reflexivo y sereno si es adulta. Si no responde o no quiere decirlo, continúa siendo cálido y presente sin asumir nada.`;
+
+  return base + perfilPersonal;
 }
 
 // ══════════════════════════════════════════════
@@ -5678,6 +5996,43 @@ CÓMO ACOMPAÑARLOS:
 const MEMORY_KEY     = 'sentinelUserMemory';   // legacy — solo para migrar
 const MEMORY_ENC_KEY = 'sentinelMemoryEnc';    // cifrado: { salt, iv, data }
 const MEMORY_OPT_OUT = 'sentinelMemoryNoPin';  // '1' si el usuario saltó el PIN
+const PIN_SESSION_KEY = 'sentinelPinSession';   // sessionStorage: { keyB64, expiresAt }
+
+// ── Sesión de PIN — exportar/importar clave en sessionStorage ──────────────
+// La CryptoKey se exporta como bytes raw en base64 con un timestamp de expiración.
+// sessionStorage se borra automáticamente al cerrar la pestaña.
+
+async function _savePinSession(key, hours) {
+  if (!hours || hours <= 0) return;
+  try {
+    var raw    = await crypto.subtle.exportKey('raw', key);
+    var b64    = btoa(String.fromCharCode.apply(null, new Uint8Array(raw)));
+    var expiry = Date.now() + hours * 3600 * 1000;
+    sessionStorage.setItem(PIN_SESSION_KEY, JSON.stringify({ keyB64: b64, expiresAt: expiry }));
+  } catch(e) { /* si falla, simplemente no cacheamos */ }
+}
+
+async function _loadPinSession() {
+  try {
+    var raw = sessionStorage.getItem(PIN_SESSION_KEY);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (!obj || !obj.keyB64 || Date.now() > obj.expiresAt) {
+      sessionStorage.removeItem(PIN_SESSION_KEY);
+      return null;
+    }
+    var bytes = Uint8Array.from(atob(obj.keyB64), function(c){ return c.charCodeAt(0); });
+    var key   = await crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    return key;
+  } catch(e) {
+    sessionStorage.removeItem(PIN_SESSION_KEY);
+    return null;
+  }
+}
+
+function _clearPinSession() {
+  sessionStorage.removeItem(PIN_SESSION_KEY);
+}
 
 // Estado de sesión — nunca persiste fuera de esta pestaña
 var _memCryptoKey = null;  // CryptoKey derivada del PIN (null = bloqueado)
@@ -5686,7 +6041,7 @@ var _pinModalMode = 'setup';
 
 // ── Primitivas criptográficas ──────────────────────────────
 
-async function _memDerive(pin, saltB64) {
+async function _memDerive(pin, saltB64, extractable) {
   var enc  = new TextEncoder();
   var salt = Uint8Array.from(atob(saltB64), function(c){ return c.charCodeAt(0); });
   var base = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
@@ -5694,7 +6049,7 @@ async function _memDerive(pin, saltB64) {
     { name: 'PBKDF2', salt: salt, iterations: 150000, hash: 'SHA-256' },
     base,
     { name: 'AES-GCM', length: 256 },
-    false,
+    extractable === true, // true solo cuando se necesita exportar para sessionStorage
     ['encrypt', 'decrypt']
   );
 }
@@ -5749,6 +6104,7 @@ async function saveUserMemory(mem) {
 function clearUserMemory() {
   _memCache = null;
   _memCryptoKey = null;
+  _clearPinSession();
   localStorage.removeItem(MEMORY_ENC_KEY);
   localStorage.removeItem(MEMORY_KEY);
   localStorage.removeItem(MEMORY_OPT_OUT);
@@ -5781,6 +6137,7 @@ function _showPinModal(mode) {
     confirmW.style.display = 'block';
     skipBtn.style.display  = 'inline';
     forgotBtn.style.display= 'none';
+    document.getElementById('pin-session-wrap').style.display = 'none';
   } else {
     title.textContent      = 'Perfil protegido';
     sub.textContent        = 'Ingresa tu PIN para que Aura recuerde lo que aprendió de ti en sesiones anteriores.';
@@ -5789,6 +6146,8 @@ function _showPinModal(mode) {
     confirmW.style.display = 'none';
     skipBtn.style.display  = 'none';
     forgotBtn.style.display= 'inline';
+    document.getElementById('pin-session-wrap').style.display = 'block';
+    document.getElementById('pin-session-hours').value = '0';
   }
 
   modal.style.display = 'flex';
@@ -5868,10 +6227,15 @@ async function submitPin() {
     } else {
       var stored = JSON.parse(localStorage.getItem(MEMORY_ENC_KEY) || 'null');
       if (!stored || !stored.salt) throw new Error('no_data');
-      var key     = await _memDerive(pin, stored.salt);
+      // Derivar la clave como extractable si el usuario quiere mantener sesión
+      var sessionHours = parseInt(document.getElementById('pin-session-hours').value || '0', 10);
+      var key     = await _memDerive(pin, stored.salt, sessionHours > 0);
       var profile = await _memDecrypt(stored.iv, stored.data, key);
       _memCryptoKey = key;
       _memCache     = profile;
+
+      // Guardar sesión en sessionStorage si el usuario eligió duración
+      if (sessionHours > 0) await _savePinSession(key, sessionHours);
 
       icon.className = 'fas fa-check';
       label.textContent = '¡Perfil cargado!';
@@ -6047,6 +6411,10 @@ async function importMemoryFile(input) {
 // ── Inicialización — llamada al entrar al perfil ──────────
 
 function initMemoryEncryption() {
+  // Si la clave ya está activa en memoria, no hacer nada —
+  // el usuario ya desbloqueó el perfil en esta sesión de página.
+  if (_memCryptoKey || localStorage.getItem(MEMORY_OPT_OUT) === '1' && _memCache) return;
+
   var hasEnc    = !!localStorage.getItem(MEMORY_ENC_KEY);
   var hasLegacy = !!localStorage.getItem(MEMORY_KEY);
   var optedOut  = localStorage.getItem(MEMORY_OPT_OUT) === '1';
@@ -6058,18 +6426,37 @@ function initMemoryEncryption() {
     } catch(e) { _memCache = emptyProfile(); }
     return;
   }
+
+  if (hasEnc) {
+    // Intentar restaurar sesión cacheada antes de pedir el PIN
+    _loadPinSession().then(function(cachedKey) {
+      if (cachedKey) {
+        // Tenemos una clave válida en sessionStorage → descifrar sin pedir PIN
+        var stored = JSON.parse(localStorage.getItem(MEMORY_ENC_KEY) || 'null');
+        if (stored && stored.iv && stored.data) {
+          _memDecrypt(stored.iv, stored.data, cachedKey).then(function(profile) {
+            _memCryptoKey = cachedKey;
+            _memCache     = profile;
+            renderMemoryPreview();
+            updateMoodChart();
+          }).catch(function() {
+            // Clave cacheada inválida (datos cambiaron) → pedir PIN
+            _clearPinSession();
+            setTimeout(function(){ _showPinModal('unlock'); }, 400);
+          });
+          return;
+        }
+      }
+      setTimeout(function(){ _showPinModal('unlock'); }, 400);
+    });
+    return;
+  }
+
   if (!hasEnc && !hasLegacy) {
-    // Primera vez: ofrecer crear PIN
     setTimeout(function(){ _showPinModal('setup'); }, 400);
     return;
   }
-  if (hasEnc) {
-    // Datos cifrados → pedir PIN
-    setTimeout(function(){ _showPinModal('unlock'); }, 400);
-    return;
-  }
   if (hasLegacy) {
-    // Datos en texto claro (versión anterior) → ofrecer migrar
     setTimeout(function(){ _showPinModal('setup'); }, 400);
   }
 }
@@ -6362,41 +6749,115 @@ let pendingFiles = [];
 //   • Para borrar: botón "Nueva conversación" o cierre del modal
 //     de salida. El borrado es inmediato e irrevocable.
 // ══════════════════════════════════════════════
-const CHAT_STORAGE_KEY  = 'sentinelChatSession';
-const CHAT_MAX_DAYS     = 7;   // auto-expire tras 7 días sin abrir
-const CHAT_MAX_MESSAGES = 30;  // máx mensajes almacenados
+const CHAT_STORAGE_KEY  = 'sentinelChatSession';   // legacy — solo para migrar
+const CHAT_HISTORY_KEY  = 'sentinelChatHistory';   // array de hasta 5 sesiones
+const CHAT_MAX_DAYS     = 30;  // auto-expire tras 30 días
+const CHAT_MAX_MESSAGES = 30;  // máx mensajes por sesión
+const CHAT_MAX_SESSIONS = 5;   // máx sesiones guardadas
 
-// Llamada SOLO desde confirmSaveSession() — nunca automáticamente
+// ── Cargar todas las sesiones guardadas ────────────────────
+function loadAllSessions() {
+  try {
+    // Migrar sesión legacy si existe
+    const legacy = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (parsed && parsed.history && parsed.history.length) {
+        const sessions = [];
+        try { const s = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]'); sessions.push(...s); } catch(e) {}
+        // Solo migrar si no hay una sesión igual
+        const alreadyExists = sessions.some(function(s) { return s.savedAt === parsed.savedAt; });
+        if (!alreadyExists) {
+          sessions.unshift({
+            id:       'legacy-' + Date.now(),
+            profile:  parsed.profile || 'joven',
+            savedAt:  parsed.savedAt,
+            preview:  _buildPreview(parsed.history),
+            messages: parsed.history.length,
+            history:  parsed.history
+          });
+          localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(sessions.slice(0, CHAT_MAX_SESSIONS)));
+        }
+        localStorage.removeItem(CHAT_STORAGE_KEY);
+      } else {
+        localStorage.removeItem(CHAT_STORAGE_KEY);
+      }
+    }
+
+    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (!raw) return [];
+    const sessions = JSON.parse(raw);
+    const cutoff   = Date.now() - CHAT_MAX_DAYS * 24 * 3600 * 1000;
+    return sessions.filter(function(s) { return new Date(s.savedAt).getTime() > cutoff; });
+  } catch(e) { return []; }
+}
+
+// ── Guardar sesión actual al principio del array ───────────
 function saveChatSession() {
   if (!chatHistory.length) return;
   try {
-    const payload = {
+    const sessions = loadAllSessions();
+    const preview  = _buildPreview(chatHistory);
+    const id       = 'session-' + Date.now();
+    const newSess  = {
+      id,
       profile:  currentProfile || 'joven',
       savedAt:  new Date().toISOString(),
+      preview,
+      messages: chatHistory.length,
       history:  chatHistory.slice(-CHAT_MAX_MESSAGES)
     };
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(payload));
+    // Evitar duplicar si ya existe una sesión guardada hoy del mismo perfil
+    const todayStr = new Date().toDateString();
+    const filtered = sessions.filter(function(s) {
+      return !(new Date(s.savedAt).toDateString() === todayStr && s.profile === newSess.profile);
+    });
+    filtered.unshift(newSess);
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(filtered.slice(0, CHAT_MAX_SESSIONS)));
     flashSavedPill();
-  } catch (e) { /* quota exceeded — silently skip */ }
+    renderHistoryDrawer();
+    // Mostrar botón de historial
+    var btn = document.getElementById('btn-history');
+    if (btn) btn.style.display = 'inline-flex';
+  } catch(e) { /* quota exceeded */ }
 }
 
+// ── Cargar la sesión más reciente del perfil actual ────────
 function loadChatSession() {
-  try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    const savedAt = new Date(data.savedAt);
-    const ageMs   = Date.now() - savedAt.getTime();
-    if (ageMs > CHAT_MAX_DAYS * 24 * 3600 * 1000) {
-      localStorage.removeItem(CHAT_STORAGE_KEY);
-      return null;
-    }
-    return data;
-  } catch (e) { return null; }
+  const sessions = loadAllSessions();
+  if (!sessions.length) return null;
+  return sessions.find(function(s) {
+    var p = currentProfile || 'personal';
+    // Compatibilidad con sesiones legacy guardadas como 'joven' o 'adulto'
+    if (p === 'personal') return s.profile === 'personal' || s.profile === 'joven' || s.profile === 'adulto';
+    return s.profile === p;
+  }) || null;
 }
 
+// ── Borrar una sesión por ID ───────────────────────────────
+function deleteSession(id) {
+  try {
+    const sessions = loadAllSessions().filter(function(s) { return s.id !== id; });
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(sessions));
+    renderHistoryDrawer();
+    if (!sessions.length) {
+      var btn = document.getElementById('btn-history');
+      if (btn) btn.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+// ── Borrar todas las sesiones ──────────────────────────────
 function clearChatSession() {
   localStorage.removeItem(CHAT_STORAGE_KEY);
+  localStorage.removeItem(CHAT_HISTORY_KEY);
+}
+
+// ── Preview: primeras palabras del primer mensaje del usuario ──
+function _buildPreview(history) {
+  var first = (history || []).find(function(m) { return m.role === 'user' && m.text && m.text.length > 2; });
+  if (!first) return '(sin mensajes)';
+  return first.text.slice(0, 90) + (first.text.length > 90 ? '…' : '');
 }
 
 // ── Modal de consentimiento ────────────────────
@@ -6414,13 +6875,105 @@ function confirmSaveSession() {
   saveChatSession();
 }
 
-// ── Mostrar/ocultar botón Guardar según haya mensajes ──
+// ── Mostrar/ocultar botones según haya mensajes ──
 function updateSaveButton() {
   const btn    = document.getElementById('btn-save-session');
   const btnPdf = document.getElementById('btn-pdf-chat');
   const show   = chatHistory.length > 1 ? 'inline-flex' : 'none';
   if (btn)    btn.style.display    = show;
   if (btnPdf) btnPdf.style.display = show;
+  // Mostrar historial si hay sesiones guardadas
+  var btnH = document.getElementById('btn-history');
+  if (btnH) btnH.style.display = loadAllSessions().length > 0 ? 'inline-flex' : 'none';
+}
+
+// ── Drawer de historial ────────────────────────
+function openHistoryDrawer() {
+  renderHistoryDrawer();
+  document.getElementById('history-drawer').classList.add('open');
+  document.getElementById('history-overlay').classList.add('open');
+}
+
+function closeHistoryDrawer() {
+  document.getElementById('history-drawer').classList.remove('open');
+  document.getElementById('history-overlay').classList.remove('open');
+}
+
+var _profileLabels = { personal: 'Apoyo personal', joven: 'Apoyo personal', adulto: 'Apoyo personal', padre: 'Padre/Madre', joven2: 'Apoyo personal' };
+var _profileColors = {
+  personal: 'background:rgba(107,143,113,0.15);color:var(--sage)',
+  joven:    'background:rgba(107,143,113,0.15);color:var(--sage)',
+  adulto:   'background:rgba(61,122,138,0.15);color:var(--teal)',
+  padre:    'background:rgba(155,139,180,0.15);color:var(--lavender)'
+};
+
+function renderHistoryDrawer() {
+  var list = document.getElementById('history-list');
+  if (!list) return;
+  var sessions = loadAllSessions();
+  if (!sessions.length) {
+    list.innerHTML = '<div class="history-empty"><i class="fas fa-comments"></i>No hay conversaciones guardadas aún.<br><br>Pulsa <strong>Guardar</strong> durante una conversación para conservarla.</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(function(s) {
+    var fecha = formatRelativeDate(s.savedAt);
+    var hora  = new Date(s.savedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    var badge = _profileLabels[s.profile] || s.profile;
+    var color = _profileColors[s.profile] || 'background:rgba(61,122,138,0.12);color:var(--teal)';
+    return '<div class="history-card" onclick="restoreSession(\'' + s.id + '\')">'
+      + '<div class="history-card-top">'
+      + '<span class="history-card-badge" style="' + color + '">' + badge + '</span>'
+      + '<span class="history-card-date">' + fecha + ' · ' + hora + '</span>'
+      + '</div>'
+      + '<div class="history-card-preview">' + (s.preview || '').replace(/</g,'&lt;') + '</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">'
+      + '<span class="history-card-msgs"><i class="fas fa-comment" style="margin-right:4px;"></i>' + (s.messages || 0) + ' mensajes</span>'
+      + '<button onclick="event.stopPropagation();confirmDeleteSession(\'' + s.id + '\')" '
+      + 'style="background:none;border:none;color:var(--text-light);cursor:pointer;font-size:0.75rem;padding:2px 6px;border-radius:6px;transition:all 0.2s;" '
+      + 'onmouseover="this.style.color=\'var(--red-alert)\'" onmouseout="this.style.color=\'var(--text-light)\'">'
+      + '<i class="fas fa-trash-can"></i></button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function restoreSession(id) {
+  var sessions = loadAllSessions();
+  var session  = sessions.find(function(s) { return s.id === id; });
+  if (!session) return;
+  if (chatHistory.length > 1) {
+    if (!confirm('¿Cargar esta conversación? La conversación actual se perderá si no la guardaste.')) return;
+  }
+  closeHistoryDrawer();
+  // Cambiar perfil si es diferente
+  currentProfile = session.profile;
+  // Limpiar pantalla
+  var container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+  chatHistory = [];
+  _ctxSummaryCache = null; _ctxSummaryAtLength = 0;
+  // Restaurar
+  chatHistory = session.history;
+  var bar   = document.getElementById('session-restore-bar');
+  var label = document.getElementById('session-restore-label');
+  if (bar && label) {
+    var when = formatRelativeDate(session.savedAt);
+    var time = new Date(session.savedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    label.textContent = when === 'Hoy'
+      ? 'Retomando conversación de hoy · ' + time
+      : 'Retomando conversación del ' + when.toLowerCase();
+    bar.style.display = 'flex';
+  }
+  insertDateSeparator(formatRelativeDate(session.savedAt));
+  session.history.forEach(function(m) { appendMessageSilent(m.role, m.text, m.time || null); });
+  var todayLabel = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+  insertDateSeparator('Ahora · ' + todayLabel);
+  updateSaveButton();
+  updateEditButtons();
+}
+
+function confirmDeleteSession(id) {
+  if (!confirm('¿Borrar esta conversación guardada? No se puede deshacer.')) return;
+  deleteSession(id);
 }
 
 function flashSavedPill() {
@@ -6500,8 +7053,10 @@ function openChat() {
 
   if (currentProfile === 'padre') {
     document.getElementById('chat-badge').textContent = 'Guía para padres';
+  } else if (currentProfile === 'personal' || currentProfile === 'joven' || currentProfile === 'adulto') {
+    document.getElementById('chat-badge').textContent = 'Apoyo personal';
   } else {
-    document.getElementById('chat-badge').textContent = currentProfile === 'joven' ? 'Joven' : 'Adulto';
+    document.getElementById('chat-badge').textContent = currentProfile || 'Apoyo personal';
   }
   history.pushState({ screen: 's-chat' }, '');
   window.scrollTo(0, 0);
@@ -6547,6 +7102,9 @@ function openChat() {
     // ── Fresh session ──
     initChat();
   }
+
+  // Mostrar/ocultar botones según historial guardado y mensajes actuales
+  updateSaveButton();
 }
 
 function confirmarNuevaConversacion() {
@@ -6563,14 +7121,16 @@ function nuevaConversacion() {
 
 function limpiarYReiniciar() {
   stopTTS();
+  exitVoiceMode();
   extractAndSaveMemory(); // guardar memoria antes de limpiar el historial
   clearChatSession();
   const container = document.getElementById('chat-messages');
   container.innerHTML = '';
   chatHistory  = [];
   pendingFiles = [];
-  _ctxSummaryCache    = null; // limpiar cache del resumen de contexto
+  _ctxSummaryCache    = null;
   _ctxSummaryAtLength = 0;
+  _detectedAgeGroup   = null; // resetear detección de edad
   renderFilePreviews();
   // Hide UI elements
   const bar  = document.getElementById('session-restore-bar');
@@ -6619,6 +7179,20 @@ function initChat() {
   }
 
   appendMessage('ai', greeting);
+}
+
+// ── Detección de edad a partir del texto del usuario ──────────
+// Solo corre para el perfil 'personal' y una sola vez.
+function _detectAgeFromText(text) {
+  if (currentProfile !== 'personal' || _detectedAgeGroup) return;
+  if (!text) return;
+  var match = text.match(/\b(\d{1,2})\s*(?:años?|año)\b/i)
+    || text.match(/tengo\s+(\d{1,2})\b/i)
+    || text.match(/soy\s+(?:de\s+)?(\d{1,2})\b/i);
+  if (!match) return;
+  var age = parseInt(match[1], 10);
+  if (age < 5 || age > 110) return;
+  _detectedAgeGroup = age < 25 ? 'joven' : 'adulto';
 }
 
 const CRISIS_WORDS = [
@@ -6970,8 +7544,11 @@ async function startRecording() {
   mediaRecorder.start(200); // collect chunks every 200 ms
 
   isRecording = true;
-  document.getElementById('mic-btn').classList.add('recording');
-  document.getElementById('mic-btn').innerHTML = '<i class="fas fa-stop"></i>';
+  const micBtn = document.getElementById('mic-btn');
+  micBtn.classList.add('recording');
+  micBtn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i>';
+  micBtn.setAttribute('aria-pressed', 'true');
+  micBtn.setAttribute('aria-label', 'Detener grabación');
   document.getElementById('voice-status').classList.add('active');
   document.getElementById('voice-interim').textContent = 'Grabando…';
 }
@@ -6979,8 +7556,11 @@ async function startRecording() {
 function stopRecording() {
   if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   isRecording = false;
-  document.getElementById('mic-btn').classList.remove('recording');
-  document.getElementById('mic-btn').innerHTML = '<i class="fas fa-microphone"></i>';
+  const micBtn = document.getElementById('mic-btn');
+  micBtn.classList.remove('recording');
+  micBtn.innerHTML = '<i class="fas fa-microphone" aria-hidden="true"></i>';
+  micBtn.setAttribute('aria-pressed', 'false');
+  micBtn.setAttribute('aria-label', 'Activar micrófono para hablar con Aura');
   document.getElementById('voice-status').classList.remove('active');
   document.getElementById('voice-interim').textContent = '';
 }
@@ -7024,10 +7604,16 @@ async function transcribeAudio() {
 
   } catch (err) {
     appendMessage('ai', '⚠️ ' + err.message);
+    // En modo voz: reactivar el micrófono tras el error para continuar el ciclo
+    if (voiceModeActive) {
+      setTimeout(function() { _voiceModeStartMic(); }, 1200);
+    }
   } finally {
     document.getElementById('voice-status').classList.remove('active');
     document.getElementById('voice-interim').textContent = '';
-    document.getElementById('mic-btn').innerHTML = '<i class="fas fa-microphone"></i>';
+    document.getElementById('mic-btn').innerHTML = '<i class="fas fa-microphone" aria-hidden="true"></i>';
+    document.getElementById('mic-btn').setAttribute('aria-pressed', 'false');
+    document.getElementById('mic-btn').setAttribute('aria-label', 'Activar micrófono para hablar con Aura');
     document.getElementById('mic-btn').disabled = false;
   }
 }
@@ -7035,7 +7621,67 @@ async function transcribeAudio() {
 // ── Text-to-Speech (TTS) ──────────────────────
 function setTTS(enabled) {
   ttsEnabled = enabled;
-  if (!enabled) stopTTS();
+  if (!enabled) {
+    stopTTS();
+    // Si se desactiva TTS manualmente, también salir del modo voz
+    if (voiceModeActive) setVoiceMode(false);
+  }
+}
+
+// ── Modo conversación de voz ───────────────────────────────
+// voiceModeActive: cuando true, TTS está activo y al terminar
+// de hablar Aura el micrófono se activa automáticamente.
+var voiceModeActive = false;
+
+function toggleVoiceMode() {
+  setVoiceMode(!voiceModeActive);
+}
+
+function setVoiceMode(active) {
+  voiceModeActive = active;
+  var btn     = document.getElementById('voice-mode-btn');
+  var waiting = document.getElementById('voice-mode-waiting');
+  var ttsChk  = document.getElementById('tts-toggle');
+
+  if (active) {
+    // Verificar soporte de voz
+    if (!window.speechSynthesis) {
+      alert('Tu navegador no soporta síntesis de voz. Prueba con Chrome o Edge.');
+      voiceModeActive = false;
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Tu navegador no soporta el micrófono.');
+      voiceModeActive = false;
+      return;
+    }
+    // Activar TTS automáticamente
+    ttsEnabled = true;
+    if (ttsChk) { ttsChk.checked = true; }
+    if (btn) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      btn.innerHTML = '<i class="fas fa-stop" aria-hidden="true"></i> Salir del modo voz';
+    }
+    if (waiting) waiting.classList.remove('active');
+    // Activar el micrófono inmediatamente al entrar al modo voz
+    _voiceModeStartMic();
+  } else {
+    voiceModeActive = false;
+    stopTTS();
+    if (isRecording) stopRecording();
+    if (btn) {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.innerHTML = '<i class="fas fa-microphone-lines" aria-hidden="true"></i> Modo voz';
+    }
+    if (waiting) waiting.classList.remove('active');
+  }
+}
+
+// Llamado por stopTTS, limpiarYReiniciar, openCrisisMode, goBackFromChat
+function exitVoiceMode() {
+  if (voiceModeActive) setVoiceMode(false);
 }
 
 function stopTTS() {
@@ -7046,7 +7692,11 @@ function stopTTS() {
 }
 
 function speakText(text) {
-  if (!ttsEnabled || !window.speechSynthesis) return;
+  if (!ttsEnabled || !window.speechSynthesis) {
+    // Si modo voz activo pero TTS no disponible, activar mic directamente
+    if (voiceModeActive) _voiceModeStartMic();
+    return;
+  }
   stopTTS();
 
   const clean = text
@@ -7055,25 +7705,81 @@ function speakText(text) {
     .replace(/\n/g, ' ')
     .replace(/800 911-2000|55 5259-8121|800 222-2268/g, '')
     .trim();
-  if (!clean) return;
+  if (!clean) {
+    if (voiceModeActive) _voiceModeStartMic();
+    return;
+  }
 
   const utter    = new SpeechSynthesisUtterance(clean);
   utter.lang     = 'es-MX';
-  utter.rate     = 0.95;
-  utter.pitch    = 1.05;
+  utter.rate     = 0.92;
+  utter.pitch    = 1.0;
 
-  const voices   = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v =>
-    v.lang === 'es-MX' || (v.lang.startsWith('es') && !v.name.toLowerCase().includes('male'))
-  ) || voices.find(v => v.lang.startsWith('es'));
+  const voices = window.speechSynthesis.getVoices();
+
+  // Lista de prioridad: voces más naturales conocidas por plataforma
+  // iOS: Paulina (es-MX) es la mejor. Android: Google Español.
+  const PREFERRED_NAMES = [
+    'paulina',          // iOS es-MX — la más natural en Apple
+    'monica',           // iOS es-ES — buena alternativa
+    'google español',   // Android Chrome — calidad Google
+    'google spanish',
+    'microsoft sabina', // Windows Edge — natural
+    'microsoft helena',
+    'jorge',            // macOS es-ES
+    'marisol',          // macOS es-MX
+  ];
+
+  // 1. Buscar por nombre conocido (insensible a mayúsculas)
+  let preferred = null;
+  for (const name of PREFERRED_NAMES) {
+    preferred = voices.find(v => v.name.toLowerCase().includes(name));
+    if (preferred) break;
+  }
+
+  // 2. Si no encontró ninguna conocida, priorizar es-MX femenino
+  if (!preferred) {
+    preferred = voices.find(v => v.lang === 'es-MX' && !v.name.toLowerCase().includes('male'))
+      || voices.find(v => v.lang === 'es-MX')
+      || voices.find(v => v.lang.startsWith('es-') && !v.name.toLowerCase().includes('male'))
+      || voices.find(v => v.lang.startsWith('es'));
+  }
+
   if (preferred) utter.voice = preferred;
 
-  utter.onstart = () => { const i=document.getElementById('tts-indicator'); if(i) i.classList.add('active'); };
-  utter.onend   = () => { const i=document.getElementById('tts-indicator'); if(i) i.classList.remove('active'); };
-  utter.onerror = () => { const i=document.getElementById('tts-indicator'); if(i) i.classList.remove('active'); };
+  utter.onstart = () => {
+    const i = document.getElementById('tts-indicator');
+    if (i) i.classList.add('active');
+    // Ocultar "Escuchando…" mientras Aura habla
+    const w = document.getElementById('voice-mode-waiting');
+    if (w) w.classList.remove('active');
+  };
+  utter.onend = () => {
+    const i = document.getElementById('tts-indicator');
+    if (i) i.classList.remove('active');
+    // En modo voz: activar micrófono automáticamente
+    if (voiceModeActive) _voiceModeStartMic();
+  };
+  utter.onerror = () => {
+    const i = document.getElementById('tts-indicator');
+    if (i) i.classList.remove('active');
+    if (voiceModeActive) _voiceModeStartMic();
+  };
 
   currentUtterance = utter;
   window.speechSynthesis.speak(utter);
+}
+
+// Activa el micrófono con un pequeño delay en modo voz
+function _voiceModeStartMic() {
+  if (!voiceModeActive) return;
+  const waiting = document.getElementById('voice-mode-waiting');
+  if (waiting) waiting.classList.add('active');
+  // Pequeña pausa para que el usuario note que Aura terminó
+  setTimeout(function() {
+    if (!voiceModeActive) return;
+    startRecording().catch(function() { setVoiceMode(false); });
+  }, 600);
 }
 
 if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = () => {};
@@ -7084,8 +7790,8 @@ function openCrisisMode() {
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  exitVoiceMode();
   overlay.focus && overlay.focus();
-  // Log anónimo de crisis (fire-and-forget)
   logCrisisEvent('usuario');
 }
 
@@ -7214,6 +7920,8 @@ async function sendMessage() {
 
   // ── Push to history FIRST so appendMessage can annotate the timestamp ──
   chatHistory.push({ role: 'user', text: text || '[archivo adjunto]' });
+  // Detectar edad si el usuario la menciona (actualiza el tono de Aura)
+  _detectAgeFromText(text);
 
   const fileInfoDisplay = files.length
     ? (files[0].type === 'image' ? { type: 'image', data: files[0].data, name: files[0].name } : { type: 'file', name: files[0].name })
@@ -7356,8 +8064,8 @@ async function sendMessage() {
 <!-- ══════════════════════════════════════════════
      BOTÓN DE PÁNICO — VISIBLE EN TODAS LAS PANTALLAS
 ═══════════════════════════════════════════════ -->
-<button id="panic-btn" onclick="openCrisisMode()" aria-label="Modo de crisis inmediata">
-  <span class="panic-icon"><i class="fas fa-phone-volume"></i></span>
+<button id="panic-btn" onclick="openCrisisMode()" aria-label="Activar modo de crisis — líneas de ayuda inmediata" aria-haspopup="dialog">
+  <span class="panic-icon" aria-hidden="true"><i class="fas fa-phone-volume"></i></span>
   <span class="panic-label">Necesito ayuda ahora</span>
 </button>
 
@@ -7494,6 +8202,26 @@ async function sendMessage() {
       border:1px solid rgba(192,57,43,0.18);border-radius:9px;text-align:left;">
     </div>
 
+    <!-- Duración de sesión (solo en modo unlock) -->
+    <div id="pin-session-wrap" style="display:none;margin-bottom:14px;">
+      <label style="font-size:0.78rem;color:var(--text-light);display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <i class="fas fa-clock" style="color:var(--teal);font-size:0.8rem;"></i>
+        Mantener sesión abierta:
+        <select id="pin-session-hours"
+          style="background:var(--warm-white);border:1px solid var(--border);border-radius:8px;
+          padding:4px 8px;font-size:0.78rem;color:var(--text-dark);font-family:'DM Sans',sans-serif;
+          cursor:pointer;outline:none;">
+          <option value="0">No recordar</option>
+          <option value="1">1 hora</option>
+          <option value="4">4 horas</option>
+          <option value="8">8 horas</option>
+        </select>
+      </label>
+      <p style="font-size:0.7rem;color:var(--text-light);margin-top:5px;padding-left:20px;line-height:1.5;">
+        La sesión se cierra al cerrar esta pestaña del navegador.
+      </p>
+    </div>
+
     <!-- Botón principal -->
     <button id="pin-submit-btn" onclick="submitPin()"
       style="width:100%;padding:13px;background:linear-gradient(135deg,var(--sage),var(--teal));
@@ -7520,6 +8248,22 @@ async function sendMessage() {
       </button>
     </div>
 
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     HISTORIAL DE SESIONES — DRAWER LATERAL
+═══════════════════════════════════════════════ -->
+<div class="history-drawer-overlay" id="history-overlay" onclick="closeHistoryDrawer()"></div>
+<div id="history-drawer" role="dialog" aria-modal="true" aria-label="Historial de conversaciones">
+  <div class="history-drawer-header">
+    <h3><i class="fas fa-clock-rotate-left" style="color:var(--teal);margin-right:8px;font-size:0.9rem;"></i>Conversaciones guardadas</h3>
+    <button class="history-close-btn" onclick="closeHistoryDrawer()" aria-label="Cerrar historial">
+      <i class="fas fa-xmark"></i>
+    </button>
+  </div>
+  <div class="history-list" id="history-list">
+    <!-- Relleno por renderHistoryDrawer() -->
   </div>
 </div>
 
@@ -7689,7 +8433,7 @@ function exportChatPDF() {
     return;
   }
 
-  const profileLabels = { joven: 'Joven', adulto: 'Adulto', padre: 'Guía para padres', maestro: 'Maestro/a', salud: 'Salud' };
+  const profileLabels = { personal: 'Apoyo personal', joven: 'Apoyo personal', adulto: 'Apoyo personal', padre: 'Guía para padres', maestro: 'Maestro/a', salud: 'Salud' };
   const profileLabel  = profileLabels[currentProfile] || 'Usuario';
   const fecha  = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const hora   = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', hour12: true });
