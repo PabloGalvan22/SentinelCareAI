@@ -2420,12 +2420,31 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .validation-header {
-  display: flex; align-items: center; gap: 10px; margin: 14px 0 8px;
-  padding: 10px 14px; border-radius: 10px;
+  display: flex; flex-direction: column; gap: 8px; margin: 14px 0 8px;
+  padding: 12px 14px; border-radius: 10px;
   background: rgba(0,212,255,0.06); border: 1px solid rgba(0,212,255,0.15);
   font-size: 0.82rem; color: #7ac8d4;
 }
 .validation-header i { font-size: 1rem; }
+.val-progress-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.val-progress-bar-wrap {
+  flex: 1; height: 6px; border-radius: 3px;
+  background: rgba(0,212,255,0.12); overflow: hidden;
+}
+.val-progress-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #00d4ff, #7ac8d4);
+  transition: width 0.4s ease;
+}
+.val-progress-pct {
+  font-size: 0.75rem; font-weight: 700; color: #00d4ff;
+  white-space: nowrap; min-width: 32px; text-align: right;
+}
+.val-progress-eta {
+  font-size: 0.72rem; color: #5a7a88; white-space: nowrap;
+}
 
 /* IA Analysis markdown overrides for dark pro panel */
 .ia-md h1,.ia-md h2,.ia-md h3 { color: #e8c48a; font-family: 'Playfair Display', serif; margin: 14px 0 6px; }
@@ -3053,7 +3072,7 @@ body.dark-mode .msg-bubble .md-body code { background: rgba(0,212,255,0.1); }
         <div class="file-uploader" onclick="document.getElementById('proFileInput').click()">
           <input type="file" id="proFileInput" accept=".csv,.xlsx,.txt,image/*" multiple>
           <i class="fas fa-cloud-arrow-up"></i>
-          <p>Arrastra o selecciona tu archivo (CSV, Excel, TXT o imágenes)</p>
+          <p>Arrastra o selecciona tu archivo (CSV, PDF, Excel, TXT o imágenes)</p>
           <small>Las imágenes se procesarán con OCR automáticamente</small>
         </div>
         <div id="ocrProgress" class="ocr-progress" style="display:none;"><i class="fas fa-spinner fa-pulse"></i><span id="ocrStatus">Procesando...</span></div>
@@ -4717,27 +4736,53 @@ async function runLLMValidation(casosAltos) {
   const total      = casosAltos.length;
   const numBatches = Math.ceil(total / LLM_BATCH_SIZE);
 
+  // ── Crear banner con barra de progreso ───────────────────
   const container = document.getElementById('proTableContainer');
   const banner = document.createElement('div');
   banner.className = 'validation-header';
   banner.id = 'validation-banner';
+  banner.innerHTML =
+    '<div class="val-progress-row">' +
+      '<div class="val-spinner"></div>' +
+      '<span id="val-status-text">Preparando validación IA…</span>' +
+      '<span class="val-progress-eta" id="val-eta"></span>' +
+    '</div>' +
+    '<div class="val-progress-row">' +
+      '<div class="val-progress-bar-wrap">' +
+        '<div class="val-progress-bar-fill" id="val-bar" style="width:0%"></div>' +
+      '</div>' +
+      '<span class="val-progress-pct" id="val-pct">0%</span>' +
+    '</div>';
   container.insertBefore(banner, container.firstChild);
 
-  function setBannerProgress(done, of) {
-    const pct = Math.round((done / of) * 100);
-    banner.innerHTML =
-      '<div class="val-spinner"></div> <span>Validando con IA — lote ' + done + ' de ' + of +
-      ' (' + pct + '%) &nbsp;<span style="font-size:0.78rem;color:#808090;">' +
-      (of > 1 ? total + ' casos en ' + of + ' lotes de ' + LLM_BATCH_SIZE : total + ' caso(s)') +
-      '</span></span>';
+  // Actualiza la barra y el texto de estado
+  var startTime = Date.now();
+  function updateProgress(casosHechos) {
+    var pct  = total > 0 ? Math.round((casosHechos / total) * 100) : 0;
+    var bar  = document.getElementById('val-bar');
+    var pctEl= document.getElementById('val-pct');
+    var txt  = document.getElementById('val-status-text');
+    var eta  = document.getElementById('val-eta');
+    if (bar)   bar.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    if (txt)   txt.textContent = 'Analizando caso ' + Math.min(casosHechos + 1, total) + ' de ' + total + '…';
+
+    // Tiempo estimado restante
+    if (eta && casosHechos > 0) {
+      var elapsed   = (Date.now() - startTime) / 1000;
+      var rate      = casosHechos / elapsed;          // casos por segundo
+      var remaining = Math.ceil((total - casosHechos) / rate);
+      eta.textContent = remaining > 5 ? '~' + remaining + 's restantes' : '';
+    }
   }
 
-  let totalConfirmed = 0;
-  let totalFP        = 0;
-  let totalErrors    = 0;
+  var totalConfirmed = 0;
+  var totalFP        = 0;
+  var totalErrors    = 0;
+  var casosHechos    = 0;
 
-  for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
-    setBannerProgress(batchIdx + 1, numBatches);
+  for (var batchIdx = 0; batchIdx < numBatches; batchIdx++) {
+    updateProgress(casosHechos);
 
     const batch    = casosAltos.slice(batchIdx * LLM_BATCH_SIZE, (batchIdx + 1) * LLM_BATCH_SIZE);
     const casosStr = batch.map(r =>
@@ -4784,6 +4829,9 @@ async function runLLMValidation(casosAltos) {
         if (status === 'confirmed') totalConfirmed++; else totalFP++;
       });
 
+      casosHechos += batch.length;
+      updateProgress(casosHechos);
+
     } catch (err) {
       batch.forEach(function(r) {
         const cell = document.getElementById('val-cell-' + r.ID);
@@ -4792,24 +4840,40 @@ async function runLLMValidation(casosAltos) {
           'title="Error de validación — revisa manualmente"><i class="fas fa-triangle-exclamation"></i> Manual</span>';
         totalErrors++;
       });
+      casosHechos += batch.length;
+      updateProgress(casosHechos);
       console.warn('LLM validation error (lote ' + (batchIdx + 1) + '):', err);
     }
 
-    // Pausa entre lotes para no saturar el rate limiter (30 req/min en el worker)
+    // Pausa entre lotes para no saturar el rate limiter
     if (batchIdx < numBatches - 1) await new Promise(function(r) { setTimeout(r, 1200); });
   }
 
-  // Banner final con resumen global
+  // ── Banner final con resumen ──────────────────────────────
   const b = document.getElementById('validation-banner');
   if (!b) return;
   const parts = [];
   if (totalConfirmed) parts.push('<strong style="color:#ff6b5b;">' + totalConfirmed + ' confirmado' + (totalConfirmed > 1 ? 's' : '') + '</strong>');
   if (totalFP)        parts.push('<strong style="color:#6fbf73;">'  + totalFP        + ' posible'   + (totalFP        > 1 ? 's' : '') + ' FP</strong>');
   if (totalErrors)    parts.push('<strong style="color:#e8c48a;">'  + totalErrors    + ' sin validar (error)</strong>');
+
+  var elapsed = Math.round((Date.now() - startTime) / 1000);
   b.innerHTML =
-    '<i class="fas fa-robot"></i> <span>Validación IA (' + total + ' casos): ' +
-    (parts.length ? parts.join(' · ') : 'Completada') +
-    ' — pasa el cursor sobre cada badge para ver la razón</span>';
+    '<div class="val-progress-row">' +
+      '<i class="fas fa-robot"></i>' +
+      '<span>Validación IA completada — ' + total + ' caso' + (total > 1 ? 's' : '') +
+      ' en ' + elapsed + 's</span>' +
+    '</div>' +
+    '<div class="val-progress-row">' +
+      '<div class="val-progress-bar-wrap">' +
+        '<div class="val-progress-bar-fill" style="width:100%;background:linear-gradient(90deg,#27ae60,#6fbf73);"></div>' +
+      '</div>' +
+      '<span class="val-progress-pct" style="color:#6fbf73;">100%</span>' +
+    '</div>' +
+    (parts.length
+      ? '<div style="font-size:0.78rem;color:#7ac8d4;">' + parts.join(' &nbsp;·&nbsp; ') +
+        ' &nbsp;— pasa el cursor sobre cada badge para ver la razón</div>'
+      : '');
 }
 function updateWordCloud(keywords) {
   const canvas = document.getElementById('wordcloud-canvas');
